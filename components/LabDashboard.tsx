@@ -1,6 +1,8 @@
+
 import React, { useState, useMemo, FC, useEffect } from 'react';
-import { User, LabTest, LabTestStatus, LabResult } from '../types';
-import { MicroscopeIcon, CheckCircleIcon, XIcon } from './Icons';
+import { User, LabTest, LabTestStatus, LabResult } from '../types.ts';
+import { MicroscopeIcon, CheckCircleIcon, XIcon } from './Icons.tsx';
+import { SoundControl } from './SoundControl.tsx';
 
 interface LabDashboardProps {
   user: User;
@@ -167,9 +169,14 @@ const LabDashboard: FC<LabDashboardProps> = ({ user, labTests, onUpdateLabTest }
     return (
         <div className="container mx-auto">
             {selectedTest && <LabTestDetailModal test={selectedTest} onClose={() => setSelectedTest(null)} onUpdate={onUpdateLabTest} />}
-            <div className="mb-8">
-                <h2 className="text-3xl font-bold text-gray-800">Laboratory Dashboard</h2>
-                <p className="text-lg text-gray-600">Welcome, {user.name}</p>
+            <div className="mb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4 glass-panel rounded-3xl p-6">
+                <div>
+                    <h2 className="text-3xl font-extrabold text-gray-900 tracking-tight">Clinical Laboratory Station</h2>
+                    <p className="text-sm text-gray-500 font-semibold mt-0.5">Welcome, {user.name} • Diagnostic Tests & Automated Workflow</p>
+                </div>
+                <div className="flex items-center gap-3">
+                    <SoundControl dashboardName="Lab Station" variant="pill" />
+                </div>
             </div>
             
             <div className="flex space-x-4 overflow-x-auto min-h-[70vh] p-2">

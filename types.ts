@@ -1,3 +1,4 @@
+
 export enum UserRole {
   Patient = 'Patient',
   Doctor = 'Doctor',
@@ -14,6 +15,7 @@ export enum DoctorSpecialty {
   Neurologist = 'Neurologist',
   Oncologist = 'Oncologist',
   Pediatrician = 'Pediatrician',
+  Gynaecologist = 'Gynaecologist',
   General = 'General Practitioner',
 }
 
@@ -82,12 +84,29 @@ export enum BedStatus {
     Cleaning = 'Cleaning',
 }
 
+export interface RiskHistoryPoint {
+    timestamp: string;
+    hoursAgo: number;
+    score: number;
+}
+
 export interface Bed {
     id: string;
     ward: string;
     bedNumber: number;
     status: BedStatus;
     patientId?: string;
+    patientName?: string;
+    admissionTime?: string;
+    predictedDischargeMinutes?: number;
+    cleaningTimeRemainingMinutes?: number;
+    mlRiskScore?: number; // 0 - 100
+    mlPredictedLOSHours?: number;
+    mlConfidence?: number; // 0 - 100 percentage
+    specialtyRequired?: string;
+    acuityLevel?: 'Low' | 'Moderate' | 'High' | 'Critical';
+    lastUpdated?: string;
+    riskHistory?: RiskHistoryPoint[];
 }
 
 export interface BillingItem {
@@ -151,13 +170,51 @@ export interface Ambulance {
   unitNumber: string;
   status: AmbulanceStatus;
   etaMinutes?: number;
+  vehicleType?: 'ALS' | 'BLS' | 'Critical Care' | 'Neonatal Transport';
+  bayNumber?: string;
+  driverName?: string;
+  paramedicName?: string;
+  currentAddress?: string;
+  destinationAddress?: string;
+  speedMph?: number;
+  fuelLevelPercent?: number;
+  priorityCode?: 'Code 1 (Routine)' | 'Code 2 (Urgent)' | 'Code 3 (Emergency Hot)';
+  dispatchedAt?: string;
+  distanceKmRemaining?: number;
+  gpsCoords?: { x: number; y: number };
+  routeProgressPercent?: number;
+  etaSeconds?: number;
+  headingDeg?: number;
+  turnInstruction?: string;
+  lightsActive?: boolean;
+  onSceneTimerSeconds?: number;
+  equipmentStatus?: {
+    defibrillator: boolean;
+    oxygenLevelPercent: number;
+    ventilator: boolean;
+    suctionUnit: boolean;
+  };
   patientInfo?: {
+    name?: string;
+    age?: number;
+    gender?: string;
     complaint: string;
+    acuity?: 'Critical' | 'Urgent' | 'Stable';
     vitals: {
         heartRate: number;
         bloodPressure: string;
-    }
-  }
+        oxygenSaturation?: number;
+        respiratoryRate?: number;
+        temperature?: number;
+        ecgRhythm?: 'Normal Sinus Rhythm' | 'Sinus Tachycardia' | 'Atrial Fibrillation' | 'Ventricular Tachycardia' | 'STEMI / ST Elevation';
+    };
+    notes?: string;
+  };
+  timelineLogs?: {
+    timestamp: string;
+    status: AmbulanceStatus;
+    note: string;
+  }[];
 }
 
 export interface BroughtDeadRecord {

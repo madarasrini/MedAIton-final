@@ -1,24 +1,176 @@
+
 <!DOCTYPE html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>MediFlow AI</title>
+    <title>MediFlow AI | Novaile Hospital Management</title>
     <script src="https://cdn.tailwindcss.com"></script>
-  <script type="importmap">
+    <style>
+      @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap');
+      
+      :root {
+        --novaile-primary: #4f46e5;
+        --novaile-secondary: #10b981;
+      }
+
+      html {
+        background: #f8fafc; /* Base color for overscroll */
+      }
+
+      body {
+        font-family: 'Plus Jakarta Sans', sans-serif;
+        margin: 0;
+        overflow-x: hidden;
+        background: transparent; /* Must be transparent to see z-index -1 elements */
+      }
+
+      /* Enhanced Animated Mesh Gradient - Layer -2 */
+      .novaile-bg {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100vw;
+        height: 100vh;
+        z-index: -2;
+        background: linear-gradient(
+          125deg, 
+          #f0f9ff 0%, 
+          #e0e7ff 20%, 
+          #fdf2f8 40%, 
+          #f0fdf4 60%, 
+          #f5f3ff 80%,
+          #eff6ff 100%
+        );
+        background-size: 400% 400%;
+        animation: gradientMove 15s ease-in-out infinite;
+      }
+
+      @keyframes gradientMove {
+        0% { background-position: 0% 50%; }
+        50% { background-position: 100% 50%; }
+        100% { background-position: 0% 50%; }
+      }
+
+      /* Professional Glassmorphism */
+      .glass-panel {
+        background: rgba(255, 255, 255, 0.7);
+        backdrop-filter: blur(12px) saturate(160%);
+        -webkit-backdrop-filter: blur(12px) saturate(160%);
+        border: 1px solid rgba(255, 255, 255, 0.4);
+        box-shadow: 0 8px 32px -4px rgba(0, 0, 0, 0.04);
+      }
+
+      .hover-lift {
+        transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+      }
+      .hover-lift:hover {
+        transform: translateY(-6px);
+        box-shadow: 0 20px 40px -10px rgba(0, 0, 0, 0.06);
+      }
+
+      .ai-pulse {
+        box-shadow: 0 0 0 0 rgba(79, 70, 229, 0.4);
+        animation: pulse-novaile 3s infinite;
+      }
+      @keyframes pulse-novaile {
+        0% { transform: scale(0.98); box-shadow: 0 0 0 0 rgba(79, 70, 229, 0.4); }
+        70% { transform: scale(1.02); box-shadow: 0 0 0 12px rgba(79, 70, 229, 0); }
+        100% { transform: scale(0.98); box-shadow: 0 0 0 0 rgba(79, 70, 229, 0); }
+      }
+
+      .fade-slide-up {
+        animation: fadeSlideUp 0.7s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+      }
+      @keyframes fadeSlideUp {
+        from { opacity: 0; transform: translateY(30px); }
+        to { opacity: 1; transform: translateY(0); }
+      }
+
+      /* Ambulance Emergency Strobe Light Bars */
+      @keyframes strobe-red {
+        0%, 100% { opacity: 0.15; transform: scale(0.98); }
+        15%, 45% { opacity: 1; transform: scale(1.05); filter: drop-shadow(0 0 12px #ef4444); }
+        30%, 60% { opacity: 0.2; }
+      }
+      @keyframes strobe-blue {
+        0%, 100% { opacity: 0.15; transform: scale(0.98); }
+        50%, 80% { opacity: 1; transform: scale(1.05); filter: drop-shadow(0 0 12px #3b82f6); }
+        65%, 95% { opacity: 0.2; }
+      }
+      .animate-strobe-red {
+        animation: strobe-red 0.8s infinite cubic-bezier(0.4, 0, 0.2, 1);
+      }
+      .animate-strobe-blue {
+        animation: strobe-blue 0.8s infinite cubic-bezier(0.4, 0, 0.2, 1);
+      }
+
+      /* Radar Sweep Animation */
+      @keyframes radar-sweep {
+        from { transform: rotate(0deg); }
+        to { transform: rotate(360deg); }
+      }
+      .animate-radar-sweep {
+        transform-origin: center;
+        animation: radar-sweep 4s linear infinite;
+      }
+
+      /* Flowing Route Line Animation */
+      @keyframes route-flow {
+        from { stroke-dashoffset: 40; }
+        to { stroke-dashoffset: 0; }
+      }
+      .animate-route-flow {
+        stroke-dasharray: 8 6;
+        animation: route-flow 1.2s linear infinite;
+      }
+
+      /* Realistic Heartbeat Pump */
+      @keyframes heart-pump {
+        0% { transform: scale(1); }
+        14% { transform: scale(1.25); }
+        28% { transform: scale(1); }
+        42% { transform: scale(1.18); }
+        70% { transform: scale(1); }
+      }
+      .animate-heart-pump {
+        animation: heart-pump 1s infinite ease-in-out;
+      }
+
+      /* Scrollbar Styling */
+      ::-webkit-scrollbar {
+        width: 8px;
+      }
+      ::-webkit-scrollbar-track {
+        background: transparent;
+      }
+      ::-webkit-scrollbar-thumb {
+        background: rgba(79, 70, 229, 0.1);
+        border-radius: 10px;
+      }
+      ::-webkit-scrollbar-thumb:hover {
+        background: rgba(79, 70, 229, 0.2);
+      }
+    </style>
+    <script type="importmap">
 {
   "imports": {
-    "react/": "https://aistudiocdn.com/react@^19.2.0/",
     "react": "https://aistudiocdn.com/react@^19.2.0",
-    "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.0/",
-    "@google/genai": "https://aistudiocdn.com/@google/genai@^1.26.0"
+    "react-dom": "https://aistudiocdn.com/react-dom@^19.2.0",
+    "react-dom/client": "https://aistudiocdn.com/react-dom@^19.2.0/client",
+    "@google/genai": "https://aistudiocdn.com/@google/genai@^1.26.0",
+    "react-dom/": "https://esm.sh/react-dom@^19.2.3/",
+    "react/": "https://esm.sh/react@^19.2.3/"
   }
 }
 </script>
+  <link rel="stylesheet" href="/index.css">
 </head>
-  <body class="bg-gray-50">
+  <body>
+    <div class="novaile-bg"></div>
     <div id="root"></div>
-    <script type="module" src="/index.tsx"></script>
-  </body>
+    <script type="module" src="index.tsx"></script>
+  <script type="module" src="/index.tsx"></script>
+</body>
 </html>

@@ -1,9 +1,11 @@
+
 import React, { useState, useRef, useEffect, FC } from 'react';
-import { User } from '../types';
-import { getNcdChatbotResponse } from '../services/geminiService';
-import { SparklesIcon, UserIcon, ShieldExclamationIcon } from './Icons';
-import { translations } from './translations';
-import PharmacovigilanceModule from './PharmacovigilanceModule';
+import { User } from '../types.ts';
+import { getNcdChatbotResponse } from '../services/geminiService.ts';
+import { SparklesIcon, UserIcon, ShieldExclamationIcon } from './Icons.tsx';
+import { translations } from './translations.ts';
+import PharmacovigilanceModule from './PharmacovigilanceModule.tsx';
+import { SoundControl } from './SoundControl.tsx';
 
 interface EngineeringDashboardProps {
   user: User;
@@ -147,9 +149,14 @@ const EngineeringDashboard: React.FC<EngineeringDashboardProps> = ({ user }) => 
 
     return (
         <div className="container mx-auto space-y-6">
-            <div>
-                <h2 className="text-3xl font-bold text-gray-800">Engineering & Infrastructure</h2>
-                <p className="text-lg text-gray-600">Welcome, {user.name}. Access specialized modules below.</p>
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 glass-panel rounded-3xl p-6">
+                <div>
+                    <h2 className="text-3xl font-extrabold text-gray-900 tracking-tight">Engineering & Infrastructure</h2>
+                    <p className="text-sm text-gray-500 font-semibold mt-0.5">Welcome, {user.name} • System Analytics, AI Assistant & Pharmacovigilance</p>
+                </div>
+                <div className="flex items-center gap-3">
+                    <SoundControl dashboardName="Engineering Station" variant="pill" />
+                </div>
             </div>
 
             <div className="bg-white rounded-xl shadow-md p-2 sm:p-4">

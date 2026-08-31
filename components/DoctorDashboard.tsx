@@ -1,227 +1,9 @@
+
 import React, { useState, useMemo, FC, useEffect } from 'react';
-import { User, PatientRecord, PrescriptionSuggestion, DietPlanSuggestion, Appointment, CaseSheet as CaseSheetData, QueueItem, ComplaintTicket, LabTest, VitalSignHistory } from '../types';
-import { generateDischargeSummary, generatePrescriptionSuggestion, generateDietPlan } from '../services/geminiService';
-import { SparklesIcon, NutritionIcon, CalendarIcon, ClipboardListIcon, PencilIcon, SirenIcon, ComplaintIcon, MicroscopeIcon, ChartLineIcon } from './Icons';
-
-// --- Vitals Graph Component ---
-const VitalsGraph: FC<{ history: VitalSignHistory[] }> = ({ history }) => {
-  const [tooltip, setTooltip] = useState<{ x: number; y: number; data: VitalSignHistory; vital: 'hr' | 'bp' | 'o2' } | null>(null);
-  const width = 800;
-  const height = 400;
-  const padding = 60;
-
-  const dataPoints = useMemo(() => {
-    if (!history || history.length < 2) return null;
-
-    const minTimestamp = new Date(history[0].timestamp).getTime();
-    const maxTimestamp = new Date(history[history.length - 1].timestamp).getTime();
-    
-    const scaleX = (timestamp: string) => {
-        const time = new Date(timestamp).getTime();
-        if (maxTimestamp === minTimestamp) return padding;
-        return padding + ((time - minTimestamp) / (maxTimestamp - minTimestamp)) * (width - 2 * padding);
-    };
-
-    const heartRateValues = history.map(h => h.heartRate);
-    const minHR = Math.min(...heartRateValues) - 10;
-    const maxHR = Math.max(...heartRateValues) + 10;
-    const scaleY_HR = (val: number) => height - padding - ((val - minHR) / (maxHR - minHR)) * (height - 2 * padding);
-    
-    const bpValues = history.map(h => h.bloodPressure.split('/').map(Number)).flat();
-    const minBP = Math.min(...bpValues) - 10;
-    const maxBP = Math.max(...bpValues) + 10;
-    const scaleY_BP = (val: number) => height - padding - ((val - minBP) / (maxBP - minBP)) * (height - 2 * padding);
-
-    const o2Values = history.map(h => h.oxygenSaturation);
-    const minO2 = Math.min(...o2Values) - 2;
-    const maxO2 = Math.max(...o2Values) + 2;
-    const scaleY_O2 = (val: number) => height - padding - ((val - minO2) / (maxO2 - minO2)) * (height - 2 * padding);
-
-    const createPath = (key: 'heartRate' | 'systolic' | 'diastolic' | 'oxygenSaturation') => 
-        history.map((d, i) => {
-            let val;
-            let y;
-            if (key === 'heartRate') { val = d.heartRate; y = scaleY_HR(val); }
-            else if (key === 'systolic') { val = Number(d.bloodPressure.split('/')[0]); y = scaleY_BP(val); }
-            else if (key === 'diastolic') { val = Number(d.bloodPressure.split('/')[1]); y = scaleY_BP(val); }
-            else { val = d.oxygenSaturation; y = scaleY_O2(val); }
-            const x = scaleX(d.timestamp);
-            return `${i === 0 ? 'M' : 'L'} ${x},${y}`;
-        }).join(' ');
-        
-    const createPoints = (key: 'hr' | 'bp' | 'o2') => 
-        history.map(d => {
-            let y;
-            if (key === 'hr') y = scaleY_HR(d.heartRate);
-            else if (key === 'bp') y = scaleY_BP(Number(d.bloodPressure.split('/')[0])); // Use systolic for BP tooltip
-            else y = scaleY_O2(d.oxygenSaturation);
-            return { x: scaleX(d.timestamp), y, data: d, vital: key };
-        });
-
-    return {
-        scaleX, scaleY_HR, scaleY_BP, scaleY_O2,
-        minHR, maxHR, minBP, maxBP, minO2, maxO2,
-        pathHR: createPath('heartRate'),
-        pathBPSys: createPath('systolic'),
-        pathBPDia: createPath('diastolic'),
-        pathO2: createPath('oxygenSaturation'),
-        pointsHR: createPoints('hr'),
-        pointsBP: createPoints('bp'),
-        pointsO2: createPoints('o2'),
-        timestamps: history.map(h => h.timestamp),
-    };
-  }, [history]);
-
-  if (!dataPoints) {
-    return <div className="text-center p-8 text-gray-500">Not enough data to display the vitals graph.</div>;
-  }
-  
-  const { scaleX, scaleY_HR, pathHR, pathBPSys, pathBPDia, pathO2, pointsHR, pointsBP, pointsO2, timestamps } = dataPoints;
-  const xAxisLabels = [timestamps[0], timestamps[Math.floor(timestamps.length/2)], timestamps[timestamps.length-1]];
-
-  return (
-    <div className="bg-slate-800 text-white p-4 rounded-xl shadow-2xl overflow-x-auto">
-        <style>{`
-            .graph-path {
-                stroke-dasharray: 2000;
-                stroke-dashoffset: 2000;
-                animation: draw 2s ease-out forwards;
-            }
-            @keyframes draw {
-                to { stroke-dashoffset: 0; }
-            }
-            .pulse-dot {
-                animation: pulse 1.5s infinite;
-            }
-            @keyframes pulse {
-                0% { r: 5; opacity: 1; }
-                50% { r: 10; opacity: 0.5; }
-                100% { r: 5; opacity: 1; }
-            }
-        `}</style>
-        <svg width={width} height={height} viewBox={`0 0 ${width} ${height}`}>
-            {/* Grid */}
-            {Array.from({ length: 5 }).map((_, i) => (
-                <line key={i} x1={padding} y1={padding + i * (height - 2*padding)/4} x2={width - padding} y2={padding + i * (height - 2*padding)/4} stroke="#475569" strokeWidth="0.5" />
-            ))}
-             {xAxisLabels.map((ts, i) => (
-                 <line key={i} x1={scaleX(ts)} y1={padding} x2={scaleX(ts)} y2={height - padding} stroke="#475569" strokeWidth="0.5" />
-            ))}
-
-            {/* Axes and Labels */}
-            {Array.from({ length: 5 }).map((_, i) => {
-                const hrValue = Math.round(dataPoints.minHR + (i * (dataPoints.maxHR - dataPoints.minHR) / 4));
-                const o2Value = Math.round(dataPoints.minO2 + (i * (dataPoints.maxO2 - dataPoints.minO2) / 4));
-                const y = height - padding - (i * (height - 2*padding) / 4);
-                return (
-                    <g key={i}>
-                        <text x={padding - 15} y={y} dy="0.3em" textAnchor="end" fill="#f472b6" fontSize="12">{hrValue}</text>
-                        <text x={width - padding + 15} y={y} dy="0.3em" textAnchor="start" fill="#818cf8" fontSize="12">{o2Value}</text>
-                    </g>
-                );
-            })}
-             {xAxisLabels.map((ts, i) => (
-                 <text key={i} x={scaleX(ts)} y={height - padding + 20} textAnchor="middle" fill="#cbd5e1" fontSize="12">{new Date(ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</text>
-            ))}
-            <text x={padding - 45} y={height/2} transform={`rotate(-90, ${padding-45}, ${height/2})`} textAnchor="middle" fill="#f472b6" fontSize="14">HR / BP</text>
-            <text x={width - padding + 45} y={height/2} transform={`rotate(90, ${width-padding+45}, ${height/2})`} textAnchor="middle" fill="#818cf8" fontSize="14">SpO2 (%)</text>
-
-            {/* Paths */}
-            <path d={pathHR} fill="none" stroke="#f472b6" strokeWidth="2.5" className="graph-path" style={{ animationDelay: '0s' }}/>
-            <path d={pathBPSys} fill="none" stroke="#f472b6" strokeWidth="1.5" strokeDasharray="5,5" className="graph-path" style={{ animationDelay: '0.2s' }}/>
-            <path d={pathBPDia} fill="none" stroke="#f472b6" strokeWidth="1.5" strokeDasharray="5,5" className="graph-path" style={{ animationDelay: '0.2s' }}/>
-            <path d={pathO2} fill="none" stroke="#818cf8" strokeWidth="2.5" className="graph-path" style={{ animationDelay: '0.4s' }}/>
-            <circle cx={pointsHR[pointsHR.length-1].x} cy={pointsHR[pointsHR.length-1].y} r="5" fill="#f472b6" className="pulse-dot" />
-            <circle cx={pointsBP[pointsBP.length-1].x} cy={pointsBP[pointsBP.length-1].y} r="5" fill="#f472b6" className="pulse-dot" />
-            <circle cx={pointsO2[pointsO2.length-1].x} cy={pointsO2[pointsO2.length-1].y} r="5" fill="#818cf8" className="pulse-dot" />
-
-            <g>
-                {[...pointsHR, ...pointsBP, ...pointsO2].map((p, i) => (
-                    <circle key={i} cx={p.x} cy={p.y} r="10" fill="transparent"
-                        onMouseEnter={() => setTooltip(p)}
-                        onMouseLeave={() => setTooltip(null)}
-                    />
-                ))}
-            </g>
-
-            {tooltip && (
-                <g>
-                    <line x1={tooltip.x} y1={padding} y2={height - padding} stroke="#94a3b8" strokeWidth="1" strokeDasharray="4,4" />
-                    <rect x={tooltip.x + 10} y={tooltip.y - 30} width="120" height="55" fill="rgba(15, 23, 42, 0.8)" rx="5" stroke="#334155" />
-                    <text x={tooltip.x + 15} y={tooltip.y - 12} fill="#e2e8f0" fontSize="12">{new Date(tooltip.data.timestamp).toLocaleTimeString()}</text>
-                    <text x={tooltip.x + 15} y={tooltip.y + 5} fill="#f472b6" fontSize="12" fontWeight="bold">HR: {tooltip.data.heartRate}</text>
-                    <text x={tooltip.x + 15} y={tooltip.y + 20} fill="#818cf8" fontSize="12" fontWeight="bold">SpO2: {tooltip.data.oxygenSaturation}%</text>
-                </g>
-            )}
-        </svg>
-    </div>
-);
-
-const CaseSheet: FC<{
-  patient: PatientRecord;
-  onSave: (patientId: string, caseSheetData: CaseSheetData) => void;
-}> = ({ patient, onSave }) => {
-  const [caseSheet, setCaseSheet] = useState<CaseSheetData>(patient.caseSheet || {});
-  const [isEditing, setIsEditing] = useState(false);
-
-  useEffect(() => {
-    setCaseSheet(patient.caseSheet || {});
-    setIsEditing(false);
-  }, [patient]);
-
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-    const { name, value } = e.target;
-    setCaseSheet(prev => ({ ...prev, [name]: value }));
-  };
-
-  const handleSave = () => {
-    onSave(patient.id, caseSheet);
-    setIsEditing(false);
-  };
-  
-  const fields: { key: keyof CaseSheetData; label: string; type: 'text' | 'textarea' }[] = [
-      { key: 'occupation', label: 'Occupation', type: 'text' },
-      { key: 'place', label: 'Place', type: 'text' },
-      { key: 'presentingIllness', label: 'History of Presenting Illness', type: 'textarea' },
-      { key: 'pastHistory', label: 'Past History', type: 'textarea' },
-      { key: 'familyHistory', label: 'Family History', type: 'textarea' },
-      { key: 'personalHistory', label: 'Personal History', type: 'textarea' },
-      { key: 'treatmentHistory', label: 'Treatment History', type: 'textarea' },
-      { key: 'summary', label: 'Case Summary', type: 'textarea' },
-  ];
-
-  return (
-    <div className="bg-white p-6 rounded-lg shadow-md space-y-4">
-      <div className="flex justify-between items-center">
-        <h3 className="text-xl font-bold text-gray-800">Case Sheet</h3>
-        {!isEditing && (
-          <button onClick={() => setIsEditing(true)} className="flex items-center px-4 py-2 bg-indigo-100 text-indigo-700 text-sm font-semibold rounded-md hover:bg-indigo-200">
-            <PencilIcon className="h-4 w-4 mr-2" />
-            Edit
-          </button>
-        )}
-      </div>
-       {fields.map(field => (
-          <div key={field.key}>
-            <label className="block text-sm font-semibold text-gray-600 mb-1">{field.label}</label>
-            {isEditing ? (
-              field.type === 'textarea' ?
-              <textarea name={field.key} value={caseSheet[field.key] || ''} onChange={handleChange} rows={3} className="w-full p-2 border rounded-md" /> :
-              <input type="text" name={field.key} value={caseSheet[field.key] || ''} onChange={handleChange} className="w-full p-2 border rounded-md" />
-            ) : (
-              <p className="text-gray-800 p-2 bg-gray-50 rounded-md min-h-[2.5rem] whitespace-pre-wrap">{caseSheet[field.key] || 'Not specified'}</p>
-            )}
-          </div>
-        ))}
-      {isEditing && (
-        <div className="flex justify-end space-x-3 pt-4">
-          <button onClick={() => { setIsEditing(false); setCaseSheet(patient.caseSheet || {}); }} className="px-4 py-2 bg-gray-200 rounded-md">Cancel</button>
-          <button onClick={handleSave} className="px-4 py-2 bg-green-600 text-white rounded-md">Save Changes</button>
-        </div>
-      )}
-    </div>
-  );
-};
+import { User, PatientRecord, PrescriptionSuggestion, DietPlanSuggestion, Appointment, CaseSheet as CaseSheetData, QueueItem, ComplaintTicket, LabTest, VitalSignHistory } from '../types.ts';
+import { generateDischargeSummary, generatePrescriptionSuggestion, generateDietPlan, interpretLabResult } from '../services/geminiService.ts';
+import { SparklesIcon, NutritionIcon, CalendarIcon, ClipboardListIcon, PencilIcon, SirenIcon, ComplaintIcon, MicroscopeIcon, ChartLineIcon, CheckCircleIcon, MedicationIcon, FileTextIcon } from './Icons.tsx';
+import { SoundControl } from './SoundControl.tsx';
 
 interface DoctorDashboardProps {
   user: User;
@@ -230,258 +12,385 @@ interface DoctorDashboardProps {
   appointments: Appointment[];
   complaintTickets: ComplaintTicket[];
   labTests: LabTest[];
-  onScheduleAppointment: (data: Omit<Appointment, 'id' | 'status'>) => boolean;
+  onOrderLabTest: (patient: PatientRecord, testName: string) => void;
   onSaveCaseSheet: (patientId: string, caseSheetData: CaseSheetData) => void;
   onSilenceAlarm: (queueItemId: number) => void;
-  onOrderLabTest: (patient: PatientRecord, testName: string) => void;
+  onScheduleAppointment: (data: Omit<Appointment, 'id' | 'status'>) => boolean;
 }
 
-type ActiveTab = 'overview' | 'case-sheet' | 'diagnostics' | 'vitals-graph';
+const VitalsGraph: FC<{ history: VitalSignHistory[] }> = ({ history }) => {
+  const width = 800;
+  const height = 400;
+  const padding = 60;
 
-export const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ user, patients, erQueue, appointments, complaintTickets, labTests, onScheduleAppointment, onSaveCaseSheet, onSilenceAlarm, onOrderLabTest }) => {
-  const [selectedPatientId, setSelectedPatientId] = useState<string | null>(patients.length > 0 ? patients[0].id : null);
-  const [activeTab, setActiveTab] = useState<ActiveTab>('overview');
-  const [dischargeSummary, setDischargeSummary] = useState('');
-  const [isGeneratingSummary, setIsGeneratingSummary] = useState(false);
-  const [prescriptionSuggestion, setPrescriptionSuggestion] = useState<PrescriptionSuggestion | null>(null);
-  const [isGeneratingPrescription, setIsGeneratingPrescription] = useState(false);
-  const [dietPlan, setDietPlan] = useState<DietPlanSuggestion | null>(null);
-  const [isGeneratingDiet, setIsGeneratingDiet] = useState(false);
-  const [showOrderLabTest, setShowOrderLabTest] = useState(false);
-  const [labTestName, setLabTestName] = useState('');
+  const dataPoints = useMemo(() => {
+    if (!history || history.length < 2) return null;
+    const minTimestamp = new Date(history[0].timestamp).getTime();
+    const maxTimestamp = new Date(history[history.length - 1].timestamp).getTime();
+    const scaleX = (timestamp: string) => padding + ((new Date(timestamp).getTime() - minTimestamp) / (maxTimestamp - minTimestamp)) * (width - 2 * padding);
+    
+    const hrVals = history.map(h => h.heartRate);
+    const minHR = Math.min(...hrVals) - 10;
+    const maxHR = Math.max(...hrVals) + 10;
+    const scaleY_HR = (val: number) => height - padding - ((val - minHR) / (maxHR - minHR)) * (height - 2 * padding);
+    
+    const o2Vals = history.map(h => h.oxygenSaturation);
+    const minO2 = Math.min(...o2Vals) - 2;
+    const maxO2 = Math.max(...o2Vals) + 2;
+    const scaleY_O2 = (val: number) => height - padding - ((val - minO2) / (maxO2 - minO2)) * (height - 2 * padding);
+    
+    const createPath = (key: string) => history.map((d, i) => {
+        let y;
+        if (key === 'hr') y = scaleY_HR(d.heartRate);
+        else y = scaleY_O2(d.oxygenSaturation);
+        return `${i === 0 ? 'M' : 'L'} ${scaleX(d.timestamp)},${y}`;
+    }).join(' ');
+    
+    return { 
+        pathHR: createPath('hr'), 
+        pathO2: createPath('o2'),
+        pointsHR: history.map(d => ({ x: scaleX(d.timestamp), y: scaleY_HR(d.heartRate) }))
+    };
+  }, [history]);
+
+  if (!dataPoints) return <div className="text-center p-12 text-gray-400 font-bold uppercase tracking-widest glass-panel rounded-3xl">Surveillance Data Synchronizing...</div>;
+
+  return (
+    <div className="bg-slate-900 text-white p-6 rounded-[2.5rem] shadow-2xl overflow-x-auto relative group">
+        <div className="flex justify-between items-center mb-4">
+            <h4 className="text-xs font-black uppercase tracking-widest text-gray-400">Vital Surveillance (HR & SpO2)</h4>
+            <div className="flex gap-4">
+                <div className="flex items-center gap-2"><span className="w-3 h-3 bg-rose-500 rounded-full"></span><span className="text-[10px] font-bold uppercase">Heart Rate</span></div>
+                <div className="flex items-center gap-2"><span className="w-3 h-3 bg-indigo-500 rounded-full"></span><span className="text-[10px] font-bold uppercase">SpO2</span></div>
+            </div>
+        </div>
+        <svg width={width} height={height} viewBox={`0 0 ${width} ${height}`}>
+            <path d={dataPoints.pathHR} fill="none" stroke="#f43f5e" strokeWidth="3" strokeLinecap="round" className="opacity-80" />
+            <path d={dataPoints.pathO2} fill="none" stroke="#6366f1" strokeWidth="3" strokeLinecap="round" className="opacity-80" />
+            <circle cx={dataPoints.pointsHR[dataPoints.pointsHR.length-1].x} cy={dataPoints.pointsHR[dataPoints.pointsHR.length-1].y} r="6" fill="#f43f5e" className="animate-pulse" />
+        </svg>
+    </div>
+  );
+};
+
+const DoctorDashboard: React.FC<DoctorDashboardProps> = ({ user, patients, erQueue, appointments, complaintTickets, labTests, onOrderLabTest, onSaveCaseSheet, onSilenceAlarm, onScheduleAppointment }) => {
+  const [selectedPatientId, setSelectedPatientId] = useState<string | null>(patients[0]?.id || null);
+  const [activeTab, setActiveTab] = useState<'overview' | 'case-sheet' | 'diagnostics' | 'vitals'>('overview');
+  
+  // AI Suggestions States
+  const [aiLoading, setAiLoading] = useState<boolean>(false);
+  const [editableSuggestion, setEditableSuggestion] = useState<string>('');
+  const [suggestionType, setSuggestionType] = useState<'prescription' | 'diet' | 'summary' | null>(null);
+
+  // Interpretation States
+  const [interpretation, setInterpretation] = useState<Record<string, string>>({});
+  const [loadingInterpretation, setLoadingInterpretation] = useState<string | null>(null);
+
+  // Case Sheet States
+  const [tempCaseSheet, setTempCaseSheet] = useState<CaseSheetData>({});
 
   const selectedPatient = useMemo(() => patients.find(p => p.id === selectedPatientId), [selectedPatientId, patients]);
+  const patientLabTests = useMemo(() => labTests.filter(t => t.patientId === selectedPatientId), [labTests, selectedPatientId]);
 
   useEffect(() => {
-    setDischargeSummary('');
-    setPrescriptionSuggestion(null);
-    setDietPlan(null);
-    setShowOrderLabTest(false);
+    if (selectedPatient) {
+        setTempCaseSheet(selectedPatient.caseSheet || {});
+        setEditableSuggestion('');
+        setSuggestionType(null);
+    }
   }, [selectedPatientId]);
-  
-  const handleSelectPatient = (id: string) => {
-    setSelectedPatientId(id);
-    setActiveTab('overview');
+
+  const handleInterpret = async (testId: string, testName: string, results: any) => {
+    setLoadingInterpretation(testId);
+    const text = await interpretLabResult(testName, results);
+    setInterpretation(prev => ({ ...prev, [testId]: text }));
+    setLoadingInterpretation(null);
   };
 
-  const handleGenerateSummary = async () => {
+  const handleGenerateAISuggestion = async (type: 'prescription' | 'diet' | 'summary') => {
     if (!selectedPatient) return;
-    setIsGeneratingSummary(true);
-    const summary = await generateDischargeSummary(selectedPatient);
-    setDischargeSummary(summary);
-    setIsGeneratingSummary(false);
+    setAiLoading(true);
+    setSuggestionType(type);
+    try {
+        let result = '';
+        if (type === 'prescription') {
+            const data = await generatePrescriptionSuggestion(selectedPatient);
+            result = `Prescriptions:\n${data.prescriptions.map(p => `- ${p.drug}: ${p.dosage} ${p.frequency}`).join('\n')}\n\nRationale:\n${data.rationale}`;
+        } else if (type === 'diet') {
+            const data = await generateDietPlan(selectedPatient);
+            result = `Diet Plan:\n${data.plan.map(d => `${d.day}:\n  B: ${d.breakfast}\n  L: ${d.lunch}\n  D: ${d.dinner}`).join('\n\n')}\n\nRationale:\n${data.rationale}`;
+        } else {
+            result = await generateDischargeSummary(selectedPatient);
+        }
+        setEditableSuggestion(result);
+    } catch (error) {
+        setEditableSuggestion("Error generating suggestion. Please try again.");
+    } finally {
+        setAiLoading(false);
+    }
   };
 
-  const handleGeneratePrescription = async () => {
-    if (!selectedPatient) return;
-    setIsGeneratingPrescription(true);
-    const suggestion = await generatePrescriptionSuggestion(selectedPatient);
-    setPrescriptionSuggestion(suggestion);
-    setIsGeneratingPrescription(false);
-  };
-  
-  const handleGenerateDietPlan = async () => {
-      if (!selectedPatient) return;
-      setIsGeneratingDiet(true);
-      const plan = await generateDietPlan(selectedPatient);
-      setDietPlan(plan);
-      setIsGeneratingDiet(false);
-  };
-  
-  const handleOrderTest = () => {
-    if(!selectedPatient || !labTestName.trim()) return;
-    onOrderLabTest(selectedPatient, labTestName);
-    setLabTestName('');
-    setShowOrderLabTest(false);
-  };
-  
-  const patientLabTests = useMemo(() => {
-      if (!selectedPatient) return [];
-      return labTests.filter(t => t.patientId === selectedPatient.id);
-  }, [labTests, selectedPatient]);
-
-  const renderActiveTabContent = () => {
-    if (!selectedPatient) return <div className="text-center p-8">Please select a patient.</div>;
-
-    switch (activeTab) {
-      case 'overview':
-        return (
-          <div className="space-y-6">
-            <div className="p-4 bg-white rounded-lg shadow-md">
-                <h3 className="font-bold text-lg text-gray-800">Chief Complaint</h3>
-                <p className="text-gray-600 mt-1">{selectedPatient.chiefComplaint}</p>
-            </div>
-             <div className="p-4 bg-white rounded-lg shadow-md">
-                <h3 className="font-bold text-lg text-gray-800">Clinical Notes & Diagnosis</h3>
-                <p className="text-gray-600 mt-1 whitespace-pre-wrap">{selectedPatient.notes}</p>
-            </div>
-             <div className="p-4 bg-white rounded-lg shadow-md">
-                <h3 className="font-bold text-lg text-gray-800">AI-Powered Assistance</h3>
-                <div className="mt-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    <div className="p-4 border rounded-lg">
-                        <h4 className="font-semibold text-gray-700 flex items-center"><SparklesIcon className="h-5 w-5 mr-2 text-indigo-500"/>Generate Discharge Summary</h4>
-                        <button onClick={handleGenerateSummary} disabled={isGeneratingSummary} className="mt-2 w-full px-4 py-2 text-sm bg-indigo-600 text-white rounded-md hover:bg-indigo-700 disabled:bg-indigo-300">
-                          {isGeneratingSummary ? 'Generating...' : 'Generate'}
-                        </button>
-                        {dischargeSummary && <p className="mt-2 text-xs text-gray-600 bg-gray-100 p-2 rounded whitespace-pre-wrap">{dischargeSummary}</p>}
-                    </div>
-                    <div className="p-4 border rounded-lg">
-                        <h4 className="font-semibold text-gray-700 flex items-center"><ClipboardListIcon className="h-5 w-5 mr-2 text-blue-500"/>Suggest E-Prescription</h4>
-                        <button onClick={handleGeneratePrescription} disabled={isGeneratingPrescription} className="mt-2 w-full px-4 py-2 text-sm bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:bg-blue-300">
-                          {isGeneratingPrescription ? 'Generating...' : 'Suggest'}
-                        </button>
-                        {prescriptionSuggestion && (
-                            <div className="mt-2 text-xs text-gray-600 bg-gray-100 p-2 rounded">
-                                <strong>Rationale:</strong> {prescriptionSuggestion.rationale}
-                                <ul className="list-disc list-inside mt-1">
-                                    {prescriptionSuggestion.prescriptions.map((p,i) => <li key={i}>{p.drug} {p.dosage} {p.frequency}</li>)}
-                                </ul>
-                            </div>
-                        )}
-                    </div>
-                    <div className="p-4 border rounded-lg">
-                        <h4 className="font-semibold text-gray-700 flex items-center"><NutritionIcon className="h-5 w-5 mr-2 text-green-500"/>Suggest Diet Plan</h4>
-                        <button onClick={handleGenerateDietPlan} disabled={isGeneratingDiet} className="mt-2 w-full px-4 py-2 text-sm bg-green-600 text-white rounded-md hover:bg-green-700 disabled:bg-green-300">
-                          {isGeneratingDiet ? 'Generating...' : 'Suggest'}
-                        </button>
-                        {dietPlan && (
-                            <div className="mt-2 text-xs text-gray-600 bg-gray-100 p-2 rounded">
-                                <strong>Rationale:</strong> {dietPlan.rationale}
-                            </div>
-                        )}
-                    </div>
-                </div>
-            </div>
-          </div>
-        );
-      case 'case-sheet':
-        return <CaseSheet patient={selectedPatient} onSave={onSaveCaseSheet} />;
-      case 'diagnostics':
-        return (
-            <div className="p-4 bg-white rounded-lg shadow-md">
-                <h3 className="font-bold text-lg text-gray-800 mb-4">Diagnostic Tests</h3>
-                <button onClick={() => setShowOrderLabTest(!showOrderLabTest)} className="mb-4 px-4 py-2 text-sm bg-indigo-600 text-white rounded-md hover:bg-indigo-700">
-                    {showOrderLabTest ? 'Cancel Order' : 'Order New Lab Test'}
-                </button>
-                {showOrderLabTest && (
-                    <div className="flex gap-2 mb-4">
-                        <input type="text" value={labTestName} onChange={e => setLabTestName(e.target.value)} placeholder="Enter test name" className="p-2 border rounded-md flex-grow" />
-                        <button onClick={handleOrderTest} className="px-4 py-2 text-sm bg-green-600 text-white rounded-md">Confirm</button>
-                    </div>
-                )}
-                 <table className="min-w-full text-sm">
-                    <thead className="bg-gray-100">
-                        <tr>
-                            <th className="px-4 py-2 text-left font-semibold text-gray-700">Test Name</th>
-                            <th className="px-4 py-2 text-left font-semibold text-gray-700">Status</th>
-                            <th className="px-4 py-2 text-left font-semibold text-gray-700">Ordered On</th>
-                            <th className="px-4 py-2 text-left font-semibold text-gray-700">Results</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {patientLabTests.map(test => (
-                            <tr key={test.id} className="border-b">
-                                <td className="px-4 py-2 text-gray-800">{test.testName}</td>
-                                <td className="px-4 py-2 text-gray-800">{test.status}</td>
-                                <td className="px-4 py-2 text-gray-800">{new Date(test.orderedAt).toLocaleDateString()}</td>
-                                <td className="px-4 py-2 text-gray-800">{test.results ? `${test.results.length} parameters` : 'Pending'}</td>
-                            </tr>
-                        ))}
-                    </tbody>
-                </table>
-            </div>
-        );
-      case 'vitals-graph':
-        return <VitalsGraph history={selectedPatient.vitalsHistory || []} />;
-      default:
-        return null;
+  const handleSaveCaseSheetLocal = () => {
+    if (selectedPatientId) {
+        onSaveCaseSheet(selectedPatientId, tempCaseSheet);
+        alert("Dynamic Case File updated successfully.");
     }
   };
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
-      <div className="md:col-span-1 space-y-4">
-          <div className="bg-white p-4 rounded-xl shadow-md">
-              <h3 className="font-bold text-lg text-gray-800 mb-3">My Patients</h3>
-              <ul className="space-y-2 h-[40vh] overflow-y-auto pr-2">
-                {patients.map(p => (
-                  <li key={p.id}>
-                    <button
-                      onClick={() => handleSelectPatient(p.id)}
-                      className={`w-full text-left p-3 rounded-md transition-colors ${
-                        selectedPatientId === p.id ? 'bg-indigo-500 text-white shadow' : 'bg-gray-100 hover:bg-gray-200'
-                      }`}
-                    >
-                      <p className={`font-semibold ${selectedPatientId === p.id ? 'text-white' : 'text-gray-800'}`}>{p.name}</p>
-                      <p className={`text-sm ${selectedPatientId === p.id ? 'text-indigo-200' : 'text-gray-600'}`}>{p.chiefComplaint.substring(0,30)}...</p>
-                    </button>
-                  </li>
-                ))}
-              </ul>
-          </div>
-          <div className="bg-white p-4 rounded-xl shadow-md">
-              <h3 className="font-bold text-lg text-gray-800 mb-3">ER Queue</h3>
-              <ul className="space-y-2 h-[25vh] overflow-y-auto pr-2">
-                {erQueue.map(item => (
-                   <li key={item.id} className="p-3 bg-red-50 border-l-4 border-red-400 rounded-r-lg">
-                       <p className="font-semibold text-sm text-red-800">Bay {item.bayNumber}: {item.result.priority}</p>
-                       <p className="text-xs text-gray-700 mt-1">{item.complaint}</p>
-                       {item.isAlarming && (
-                         <button onClick={() => onSilenceAlarm(item.id)} className="mt-2 text-xs w-full py-1 bg-red-500 text-white rounded">
-                           <SirenIcon className="h-3 w-3 inline-block mr-1"/>
-                           Silence Alarm
-                         </button>
-                       )}
-                   </li>
-                ))}
-              </ul>
-          </div>
-          {complaintTickets.length > 0 && (
-              <div className="bg-white p-4 rounded-xl shadow-md">
-                  <h3 className="font-bold text-lg text-gray-800 mb-3 flex items-center"><ComplaintIcon className="h-5 w-5 mr-2 text-gray-500" /> Assigned Complaints</h3>
-                   <ul className="space-y-2 h-[15vh] overflow-y-auto pr-2">
-                    {complaintTickets.map(ticket => (
-                        <li key={ticket.id} className="p-2 bg-yellow-50 border-l-4 border-yellow-400 rounded-r-lg">
-                            <p className="font-semibold text-xs text-yellow-800">From: {ticket.patientName}</p>
-                            <p className="text-xs text-gray-700 mt-1">{ticket.summary}</p>
-                        </li>
-                    ))}
-                  </ul>
-              </div>
-          )}
+    <div className="container mx-auto space-y-6">
+      {/* Top Action & Audio Control Ribbon */}
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 glass-panel rounded-3xl p-5">
+        <div>
+          <h2 className="text-2xl font-extrabold text-gray-900 tracking-tight flex items-center gap-2">
+            Physician Clinical Workstation
+          </h2>
+          <p className="text-xs text-gray-500 font-semibold">Active ER surveillance, diagnostics, and patient case files</p>
+        </div>
+        <div className="flex items-center gap-3">
+          <SoundControl dashboardName="Physician Station" variant="pill" />
+        </div>
       </div>
 
-      <div className="md:col-span-3">
-        {selectedPatient ? (
-          <div className="space-y-6">
-            <div className="bg-white p-6 rounded-xl shadow-md">
-              <div className="flex justify-between items-start">
-                  <div>
-                    <h2 className="text-2xl font-bold text-gray-900">{selectedPatient.name}</h2>
-                    <p className="text-gray-500">{selectedPatient.age}, {selectedPatient.gender}</p>
-                  </div>
-                  <div className="text-right">
-                      <p className="text-sm text-gray-500">Bed:</p>
-                      <p className="font-semibold text-gray-800">{selectedPatient.bedId || 'N/A'}</p>
-                  </div>
-              </div>
-              <div className="mt-4 border-b border-gray-200">
-                <nav className="-mb-px flex space-x-6 overflow-x-auto">
-                    <button onClick={() => setActiveTab('overview')} className={`py-3 px-1 border-b-2 text-sm font-medium ${activeTab==='overview' ? 'border-indigo-500 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}>Overview</button>
-                    <button onClick={() => setActiveTab('case-sheet')} className={`py-3 px-1 border-b-2 text-sm font-medium ${activeTab==='case-sheet' ? 'border-indigo-500 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}>Case Sheet</button>
-                    <button onClick={() => setActiveTab('vitals-graph')} className={`flex items-center py-3 px-1 border-b-2 text-sm font-medium ${activeTab==='vitals-graph' ? 'border-indigo-500 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}><ChartLineIcon className="h-4 w-4 mr-1.5"/> Vitals Graph</button>
-                    <button onClick={() => setActiveTab('diagnostics')} className={`flex items-center py-3 px-1 border-b-2 text-sm font-medium ${activeTab==='diagnostics' ? 'border-indigo-500 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}><MicroscopeIcon className="h-4 w-4 mr-1.5"/> Diagnostics</button>
-                </nav>
-              </div>
+      <div className="flex flex-col md:flex-row gap-8">
+        <div className="md:col-span-1 space-y-4 md:w-80">
+            <div className="glass-panel rounded-[2rem] p-6 max-h-[70vh] overflow-y-auto">
+                <div className="flex items-center justify-between mb-6">
+                    <h3 className="text-xs font-black uppercase text-gray-400 tracking-widest">Active Patients</h3>
+                    <span className="px-2 py-0.5 bg-indigo-50 text-indigo-600 text-[10px] font-black rounded-lg">{patients.length}</span>
+                </div>
+                <div className="space-y-3">
+                    {patients.map(p => (
+                        <button key={p.id} onClick={() => setSelectedPatientId(p.id)} className={`w-full text-left p-4 rounded-2xl transition-all ${selectedPatientId === p.id ? 'bg-indigo-600 text-white shadow-xl scale-105' : 'bg-white hover:bg-gray-50'}`}>
+                            <p className="font-bold text-sm">{p.name}</p>
+                            <div className="flex justify-between items-center mt-1">
+                                <p className={`text-[10px] uppercase font-black tracking-widest opacity-70`}>ID: {p.id}</p>
+                                <span className={`w-2 h-2 rounded-full ${p.paymentStatus === 'Paid' ? 'bg-green-400' : 'bg-amber-400'}`}></span>
+                            </div>
+                        </button>
+                    ))}
+                </div>
             </div>
-            <div className="bg-slate-50 p-6 rounded-xl shadow-inner">
-               {renderActiveTabContent()}
-            </div>
-          </div>
-        ) : (
-          <div className="text-center p-12 bg-white rounded-xl shadow-md">Select a patient to view their details.</div>
-        )}
+        </div>
+
+        <div className="flex-grow space-y-6">
+            {selectedPatient && (
+                <>
+                    <div className="glass-panel rounded-[3rem] p-8 md:p-12 fade-slide-up">
+                        <div className="flex justify-between items-start mb-8">
+                            <div>
+                                <h2 className="text-4xl font-extrabold text-gray-900 tracking-tight">{selectedPatient.name}</h2>
+                                <p className="text-gray-500 font-bold mt-1 uppercase tracking-widest text-xs">{selectedPatient.age}Y • {selectedPatient.gender} • Ward {selectedPatient.bedId || 'N/A'}</p>
+                            </div>
+                            <div className="flex gap-2">
+                                <button onClick={() => setActiveTab('case-sheet')} className="p-3 bg-indigo-50 text-indigo-600 rounded-2xl hover:bg-indigo-100 transition-all">
+                                    <PencilIcon className="h-5 w-5" />
+                                </button>
+                            </div>
+                        </div>
+
+                        <div className="flex gap-6 border-b border-gray-100 mb-8 overflow-x-auto">
+                            {['overview', 'case-sheet', 'diagnostics', 'vitals'].map(tab => (
+                                <button key={tab} onClick={() => setActiveTab(tab as any)} className={`pb-4 px-2 text-xs font-black uppercase tracking-widest transition-all whitespace-nowrap ${activeTab === tab ? 'text-indigo-600 border-b-2 border-indigo-600' : 'text-gray-400 hover:text-gray-600'}`}>
+                                    {tab.replace('-', ' ')}
+                                </button>
+                            ))}
+                        </div>
+
+                        {activeTab === 'overview' && (
+                            <div className="space-y-8 fade-slide-up">
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                                    <div className="space-y-6">
+                                        <div className="p-8 bg-slate-50 rounded-3xl border border-slate-100">
+                                            <h4 className="text-[10px] font-black uppercase text-gray-400 tracking-widest mb-3">Presenting Complaint</h4>
+                                            <p className="text-gray-700 font-medium leading-relaxed italic">"{selectedPatient.chiefComplaint}"</p>
+                                        </div>
+                                        
+                                        <div className="p-8 glass-panel rounded-3xl">
+                                            <div className="flex items-center justify-between mb-4">
+                                                <h4 className="text-[10px] font-black uppercase text-gray-400 tracking-widest">AI Clinical Co-Pilot</h4>
+                                                <SparklesIcon className="h-4 w-4 text-indigo-500 animate-pulse" />
+                                            </div>
+                                            <div className="grid grid-cols-1 gap-3">
+                                                <button onClick={() => handleGenerateAISuggestion('prescription')} className="flex items-center justify-between p-4 bg-white border border-indigo-50 rounded-2xl hover:border-indigo-200 transition-all group">
+                                                    <div className="flex items-center gap-3">
+                                                        <MedicationIcon className="h-5 w-5 text-indigo-500" />
+                                                        <span className="text-sm font-bold text-gray-700">Suggest Prescription</span>
+                                                    </div>
+                                                    <span className="text-xs text-indigo-400 group-hover:translate-x-1 transition-transform">&rarr;</span>
+                                                </button>
+                                                <button onClick={() => handleGenerateAISuggestion('diet')} className="flex items-center justify-between p-4 bg-white border border-emerald-50 rounded-2xl hover:border-emerald-200 transition-all group">
+                                                    <div className="flex items-center gap-3">
+                                                        <NutritionIcon className="h-5 w-5 text-emerald-500" />
+                                                        <span className="text-sm font-bold text-gray-700">Suggest Diet Plan</span>
+                                                    </div>
+                                                    <span className="text-xs text-emerald-400 group-hover:translate-x-1 transition-transform">&rarr;</span>
+                                                </button>
+                                                <button onClick={() => handleGenerateAISuggestion('summary')} className="flex items-center justify-between p-4 bg-white border border-rose-50 rounded-2xl hover:border-rose-200 transition-all group">
+                                                    <div className="flex items-center gap-3">
+                                                        <FileTextIcon className="h-5 w-5 text-rose-500" />
+                                                        <span className="text-sm font-bold text-gray-700">Draft Discharge Summary</span>
+                                                    </div>
+                                                    <span className="text-xs text-rose-400 group-hover:translate-x-1 transition-transform">&rarr;</span>
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div className="space-y-6">
+                                        {aiLoading ? (
+                                            <div className="h-full flex flex-col items-center justify-center glass-panel rounded-3xl p-12 text-center space-y-4">
+                                                <div className="ai-pulse p-4 rounded-full bg-indigo-100 text-indigo-600">
+                                                    <SparklesIcon className="h-8 w-8" />
+                                                </div>
+                                                <p className="text-sm font-bold text-gray-500 uppercase tracking-widest">MediFlow Neural Network Processing...</p>
+                                            </div>
+                                        ) : editableSuggestion ? (
+                                            <div className="glass-panel rounded-3xl p-8 space-y-4 animate-fade-in">
+                                                <div className="flex items-center justify-between">
+                                                    <h4 className="text-[10px] font-black uppercase text-indigo-500 tracking-widest">AI Generated {suggestionType}</h4>
+                                                    <span className="text-[9px] font-bold text-gray-400">EDITABLE</span>
+                                                </div>
+                                                <textarea 
+                                                    value={editableSuggestion} 
+                                                    onChange={(e) => setEditableSuggestion(e.target.value)}
+                                                    className="w-full min-h-[300px] p-4 bg-indigo-50/30 rounded-2xl border-none focus:ring-2 focus:ring-indigo-500 text-sm font-medium text-gray-700 leading-relaxed"
+                                                />
+                                                <div className="flex gap-3">
+                                                    <button onClick={() => setEditableSuggestion('')} className="flex-1 py-3 text-xs font-bold text-gray-400 uppercase tracking-widest hover:text-gray-600 transition-all">Discard</button>
+                                                    <button onClick={() => {
+                                                        alert("Clinical record updated with modified AI guidance.");
+                                                        setEditableSuggestion('');
+                                                    }} className="flex-1 py-3 bg-indigo-600 text-white text-xs font-black uppercase tracking-widest rounded-xl shadow-lg shadow-indigo-100">Commit to Record</button>
+                                                </div>
+                                            </div>
+                                        ) : (
+                                            <div className="h-full p-8 border-2 border-dashed border-gray-100 rounded-[2.5rem] flex flex-col items-center justify-center text-center opacity-40">
+                                                <SparklesIcon className="h-12 w-12 text-gray-300 mb-4" />
+                                                <p className="text-sm font-bold text-gray-400 uppercase tracking-widest">Select AI guidance tool</p>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        {activeTab === 'case-sheet' && (
+                            <div className="space-y-8 fade-slide-up">
+                                <div className="flex items-center justify-between">
+                                    <h3 className="text-2xl font-bold text-gray-800">Dynamic Case File</h3>
+                                    <button onClick={handleSaveCaseSheetLocal} className="px-6 py-2 bg-emerald-600 text-white text-[10px] font-black uppercase tracking-widest rounded-xl hover:bg-emerald-700 shadow-xl shadow-emerald-100">
+                                        Sync and Save
+                                    </button>
+                                </div>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                    {[
+                                        { key: 'occupation', label: 'Occupation' },
+                                        { key: 'place', label: 'Current Residence' },
+                                        { key: 'presentingIllness', label: 'History of Presenting Illness' },
+                                        { key: 'pastHistory', label: 'Past Medical History' },
+                                        { key: 'familyHistory', label: 'Family Medical History' },
+                                        { key: 'personalHistory', label: 'Personal History' },
+                                        { key: 'treatmentHistory', label: 'Prior Treatment History' },
+                                        { key: 'summary', label: 'Clinical Summary' }
+                                    ].map(field => (
+                                        <div key={field.key} className="space-y-2">
+                                            <label className="text-[10px] font-black uppercase text-gray-400 tracking-widest ml-1">{field.label}</label>
+                                            <textarea 
+                                                value={(tempCaseSheet as any)[field.key] || ''}
+                                                onChange={(e) => setTempCaseSheet({ ...tempCaseSheet, [field.key]: e.target.value })}
+                                                className="w-full h-32 p-4 glass-panel rounded-2xl focus:ring-2 focus:ring-indigo-500 border-none text-sm font-medium text-gray-700"
+                                                placeholder={`Enter ${field.label.toLowerCase()}...`}
+                                            />
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+
+                        {activeTab === 'diagnostics' && (
+                            <div className="space-y-6 fade-slide-up">
+                                <div className="flex items-center justify-between mb-2">
+                                    <h3 className="text-2xl font-bold text-gray-800 tracking-tight">Clinical Reports</h3>
+                                    <button onClick={() => alert("Ordering new lab panel...")} className="px-4 py-2 text-[10px] font-black uppercase tracking-widest text-indigo-600 bg-indigo-50 rounded-xl">Order New Test</button>
+                                </div>
+                                {patientLabTests.length > 0 ? patientLabTests.map(test => (
+                                    <div key={test.id} className="glass-panel p-8 rounded-[2rem] hover-lift border-l-4 border-indigo-500 transition-all">
+                                        <div className="flex justify-between items-center mb-6">
+                                            <div>
+                                                <h4 className="font-bold text-gray-800 text-lg">{test.testName}</h4>
+                                                <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{new Date(test.orderedAt).toLocaleDateString()} • Ordered by {test.orderedBy}</p>
+                                            </div>
+                                            <span className="text-[10px] font-black uppercase px-3 py-1 bg-green-100 text-green-700 rounded-lg">{test.status}</span>
+                                        </div>
+                                        {test.results && (
+                                            <div className="space-y-6">
+                                                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                                                    {test.results.map((r, i) => (
+                                                        <div key={i} className="p-4 bg-white border border-gray-50 rounded-2xl">
+                                                            <p className="text-[9px] font-black uppercase text-gray-400 mb-1">{r.parameter}</p>
+                                                            <div className="flex items-baseline gap-1">
+                                                                <p className={`text-lg font-black ${r.isAbnormal ? 'text-rose-500' : 'text-gray-900'}`}>{r.value}</p>
+                                                                <p className="text-[9px] text-gray-400 font-bold">{r.referenceRange}</p>
+                                                            </div>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                                {interpretation[test.id] ? (
+                                                    <div className="p-6 bg-indigo-50/50 text-indigo-800 text-sm rounded-2xl border border-indigo-100 font-medium leading-relaxed">
+                                                        <div className="flex items-center gap-2 mb-2">
+                                                            <SparklesIcon className="h-4 w-4 text-indigo-500" />
+                                                            <span className="text-[10px] font-black uppercase tracking-widest">Neural Interpretation</span>
+                                                        </div>
+                                                        {interpretation[test.id]}
+                                                    </div>
+                                                ) : (
+                                                    <button onClick={() => handleInterpret(test.id, test.testName, test.results)} disabled={loadingInterpretation === test.id} className="w-full py-4 bg-white border border-indigo-100 text-indigo-600 text-[10px] font-black uppercase tracking-widest rounded-2xl hover:bg-indigo-50 transition-all shadow-sm">
+                                                        {loadingInterpretation === test.id ? 'Processing Clinical Data...' : 'Get AI Interpretation'}
+                                                    </button>
+                                                )}
+                                            </div>
+                                        )}
+                                    </div>
+                                )) : (
+                                    <div className="p-12 text-center glass-panel rounded-3xl opacity-50 border-dashed border-2">
+                                        <p className="text-gray-400 font-bold uppercase tracking-widest">No clinical reports available</p>
+                                    </div>
+                                )}
+                            </div>
+                        )}
+
+                        {activeTab === 'vitals' && (
+                            <div className="space-y-8 fade-slide-up">
+                                <h3 className="text-2xl font-bold text-gray-800 tracking-tight">Physiological Surveillance</h3>
+                                <VitalsGraph history={selectedPatient.vitalsHistory || []} />
+                                <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+                                    <div className="p-6 bg-slate-50 rounded-2xl">
+                                        <p className="text-[9px] font-black uppercase text-gray-400 mb-1">Mean HR</p>
+                                        <p className="text-2xl font-black text-rose-500">82 <span className="text-xs">BPM</span></p>
+                                    </div>
+                                    <div className="p-6 bg-slate-50 rounded-2xl">
+                                        <p className="text-[9px] font-black uppercase text-gray-400 mb-1">Peak BP</p>
+                                        <p className="text-2xl font-black text-gray-800">145/90</p>
+                                    </div>
+                                    <div className="p-6 bg-slate-50 rounded-2xl">
+                                        <p className="text-[9px] font-black uppercase text-gray-400 mb-1">Stable SpO2</p>
+                                        <p className="text-2xl font-black text-indigo-600">97 <span className="text-xs">%</span></p>
+                                    </div>
+                                    <div className="p-6 bg-slate-50 rounded-2xl">
+                                        <p className="text-[9px] font-black uppercase text-gray-400 mb-1">Trend Status</p>
+                                        <p className="text-2xl font-black text-emerald-500">STABLE</p>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                </>
+            )}
+        </div>
       </div>
     </div>
   );
 };
+
+export default DoctorDashboard;

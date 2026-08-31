@@ -1,10 +1,10 @@
 
 import React, { useState } from 'react';
-import { IncidentReport, IncidentStatus, IncidentType, IncidentSeverity } from '../types';
-import { MOCK_INCIDENT_REPORTS } from '../constants';
-import { analyzeIncidentReport } from '../services/geminiService';
-import { translations } from './translations';
-import { SparklesIcon, CheckCircleIcon } from './Icons';
+import { IncidentReport, IncidentStatus, IncidentType, IncidentSeverity } from '../types.ts';
+import { MOCK_INCIDENT_REPORTS } from '../constants.ts';
+import { analyzeIncidentReport } from '../services/geminiService.ts';
+import { translations } from './translations.ts';
+import { SparklesIcon, CheckCircleIcon } from './Icons.tsx';
 
 const getStatusStyles = (status: IncidentStatus) => {
     switch (status) {

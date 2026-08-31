@@ -1,18 +1,20 @@
-import { PatientRecord, Bed, BedStatus, BillingItem, Ambulance, AmbulanceStatus, BroughtDeadRecord, Appointment, AppointmentStatus, DoctorSpecialty, IncidentReport, IncidentType, IncidentStatus, IncidentSeverity, QueueItem, TriagePriority, MortuaryRecord, MortuaryStatus, ComplaintTicket, ComplaintStatus, ComplaintUrgency, ComplaintCategory, PharmacyInventoryItem, ADRReport, LabTest, LabTestStatus, VitalSignHistory } from './types';
+
+import { PatientRecord, Bed, BedStatus, BillingItem, Ambulance, AmbulanceStatus, BroughtDeadRecord, Appointment, AppointmentStatus, DoctorSpecialty, IncidentReport, IncidentType, IncidentStatus, IncidentSeverity, QueueItem, TriagePriority, MortuaryRecord, MortuaryStatus, ComplaintTicket, ComplaintStatus, ComplaintUrgency, ComplaintCategory, PharmacyInventoryItem, ADRReport, LabTest, LabTestStatus, VitalSignHistory } from './types.ts';
+import { generate24HourRiskHistory } from './utils/riskHistoryHelper.ts';
 
 export const MOCK_BEDS: Bed[] = [
-  { id: 'bed-101', ward: 'Cardiology', bedNumber: 101, status: BedStatus.Occupied, patientId: 'pat-001' },
-  { id: 'bed-102', ward: 'Cardiology', bedNumber: 102, status: BedStatus.Available },
-  { id: 'bed-103', ward: 'Cardiology', bedNumber: 103, status: BedStatus.Cleaning },
-  { id: 'bed-201', ward: 'Neurology', bedNumber: 201, status: BedStatus.Occupied, patientId: 'pat-002' },
-  { id: 'bed-202', ward: 'Neurology', bedNumber: 202, status: BedStatus.Available },
-  { id: 'bed-301', ward: 'General', bedNumber: 301, status: BedStatus.Occupied, patientId: 'pat-003' },
-  { id: 'bed-302', ward: 'General', bedNumber: 302, status: BedStatus.Available },
-  { id: 'bed-303', ward: 'General', bedNumber: 303, status: BedStatus.Available },
-  { id: 'bed-401', ward: 'Pediatrics', bedNumber: 401, status: BedStatus.Occupied, patientId: 'pat-004' },
-  { id: 'bed-402', ward: 'Pediatrics', bedNumber: 402, status: BedStatus.Cleaning },
-  { id: 'bed-403', ward: 'Pediatrics', bedNumber: 403, status: BedStatus.Available },
-  { id: 'bed-501', ward: 'General', bedNumber: 501, status: BedStatus.Occupied, patientId: 'pat-005' },
+  { id: 'bed-101', ward: 'Cardiology', bedNumber: 101, status: BedStatus.Occupied, patientId: 'pat-001', patientName: 'John Smith', predictedDischargeMinutes: 38, mlRiskScore: 78, mlPredictedLOSHours: 4.5, mlConfidence: 94, acuityLevel: 'High', specialtyRequired: 'Cardiology', riskHistory: generate24HourRiskHistory(78) },
+  { id: 'bed-102', ward: 'Cardiology', bedNumber: 102, status: BedStatus.Available, specialtyRequired: 'Cardiology' },
+  { id: 'bed-103', ward: 'Cardiology', bedNumber: 103, status: BedStatus.Cleaning, cleaningTimeRemainingMinutes: 6, specialtyRequired: 'Cardiology' },
+  { id: 'bed-201', ward: 'Neurology', bedNumber: 201, status: BedStatus.Occupied, patientId: 'pat-002', patientName: 'Emily Johnson', predictedDischargeMinutes: 65, mlRiskScore: 35, mlPredictedLOSHours: 8.0, mlConfidence: 89, acuityLevel: 'Moderate', specialtyRequired: 'Neurology', riskHistory: generate24HourRiskHistory(35) },
+  { id: 'bed-202', ward: 'Neurology', bedNumber: 202, status: BedStatus.Available, specialtyRequired: 'Neurology' },
+  { id: 'bed-301', ward: 'General', bedNumber: 301, status: BedStatus.Occupied, patientId: 'pat-003', patientName: 'Michael Williams', predictedDischargeMinutes: 110, mlRiskScore: 42, mlPredictedLOSHours: 24.0, mlConfidence: 91, acuityLevel: 'Moderate', specialtyRequired: 'General', riskHistory: generate24HourRiskHistory(42) },
+  { id: 'bed-302', ward: 'General', bedNumber: 302, status: BedStatus.Available, specialtyRequired: 'General' },
+  { id: 'bed-303', ward: 'General', bedNumber: 303, status: BedStatus.Available, specialtyRequired: 'General' },
+  { id: 'bed-401', ward: 'Pediatrics', bedNumber: 401, status: BedStatus.Occupied, patientId: 'pat-004', patientName: 'Sophia Brown', predictedDischargeMinutes: 25, mlRiskScore: 20, mlPredictedLOSHours: 3.5, mlConfidence: 96, acuityLevel: 'Low', specialtyRequired: 'Pediatrics', riskHistory: generate24HourRiskHistory(20) },
+  { id: 'bed-402', ward: 'Pediatrics', bedNumber: 402, status: BedStatus.Cleaning, cleaningTimeRemainingMinutes: 4, specialtyRequired: 'Pediatrics' },
+  { id: 'bed-403', ward: 'Pediatrics', bedNumber: 403, status: BedStatus.Available, specialtyRequired: 'Pediatrics' },
+  { id: 'bed-501', ward: 'General', bedNumber: 501, status: BedStatus.Occupied, patientId: 'pat-005', patientName: 'Alex Ray', predictedDischargeMinutes: 45, mlRiskScore: 62, mlPredictedLOSHours: 12.0, mlConfidence: 88, acuityLevel: 'Moderate', specialtyRequired: 'General', riskHistory: generate24HourRiskHistory(62) },
 ];
 
 const patientBilling: { [key: string]: BillingItem[] } = {
@@ -61,7 +63,7 @@ const generateVitalsHistory = (
     for (let i = points; i >= 0; i--) {
         const timestamp = new Date(now.getTime() - i * intervalMinutes * 60 * 1000).toISOString();
         
-        currentHR += (Math.random() - 0.5) * 4; // small fluctuations
+        currentHR += (Math.random() - 0.5) * 4;
         currentSys += (Math.random() - 0.5) * 6;
         currentDia += (Math.random() - 0.5) * 4;
         currentO2 += (Math.random() - 0.5) * 0.8;
@@ -180,7 +182,7 @@ export const MOCK_APPOINTMENTS: Appointment[] = [
     },
     {
         id: 'appt-003',
-        patientId: 'pat-005', // Alex Ray
+        patientId: 'pat-005',
         doctorId: 'user-doc-06',
         doctorName: 'Dr. James Wilson',
         specialty: DoctorSpecialty.General,
@@ -192,10 +194,215 @@ export const MOCK_APPOINTMENTS: Appointment[] = [
 ];
 
 export const MOCK_AMBULANCES: Ambulance[] = [
-  { id: 'amb-01', unitNumber: 'A101', status: AmbulanceStatus.Available },
-  { id: 'amb-02', unitNumber: 'A102', status: AmbulanceStatus.TransportingToHospital, etaMinutes: 8, patientInfo: { complaint: 'Chest pain', vitals: { heartRate: 120, bloodPressure: '150/95' } } },
-  { id: 'amb-03', unitNumber: 'B201', status: AmbulanceStatus.EnRouteToScene },
-  { id: 'amb-04', unitNumber: 'C301', status: AmbulanceStatus.AtScene },
+  {
+    id: 'amb-01',
+    unitNumber: 'A-101',
+    status: AmbulanceStatus.Available,
+    vehicleType: 'ALS',
+    bayNumber: 'ER Bay 01',
+    driverName: 'EMT Marcus Hayes',
+    paramedicName: 'Paramedic Sarah Jenkins',
+    currentAddress: 'MediFlow Trauma Center - Bay 1',
+    speedMph: 0,
+    fuelLevelPercent: 96,
+    gpsCoords: { x: 48, y: 52 },
+    headingDeg: 90,
+    routeProgressPercent: 0,
+    lightsActive: false,
+    turnInstruction: 'Standing by at Trauma Station Bay 1',
+    equipmentStatus: {
+      defibrillator: true,
+      oxygenLevelPercent: 100,
+      ventilator: true,
+      suctionUnit: true,
+    },
+    timelineLogs: [
+      { timestamp: '10:15 AM', status: AmbulanceStatus.AtHospital, note: 'Vehicle sanitized, disinfected & restocked.' },
+      { timestamp: '10:20 AM', status: AmbulanceStatus.Available, note: 'Standing by at Trauma Station Bay 1 ready for 911 dispatch.' },
+    ],
+  },
+  {
+    id: 'amb-02',
+    unitNumber: 'A-102',
+    status: AmbulanceStatus.TransportingToHospital,
+    etaMinutes: 4,
+    etaSeconds: 228,
+    distanceKmRemaining: 3.2,
+    speedMph: 58,
+    vehicleType: 'Critical Care',
+    bayNumber: 'En Route to ER Bay 2',
+    driverName: 'EMT David Ross',
+    paramedicName: 'Lead Paramedic Elena Vance',
+    currentAddress: 'Westside Expressway inbound at Exit 14',
+    destinationAddress: 'MediFlow General Trauma ER, Receiving Bay 2',
+    priorityCode: 'Code 3 (Emergency Hot)',
+    dispatchedAt: '10:04 AM',
+    fuelLevelPercent: 82,
+    gpsCoords: { x: 34, y: 64 },
+    headingDeg: 45,
+    routeProgressPercent: 62,
+    lightsActive: true,
+    turnInstruction: 'Speeding East on Westside Expressway toward Trauma Base',
+    equipmentStatus: {
+      defibrillator: true,
+      oxygenLevelPercent: 78,
+      ventilator: true,
+      suctionUnit: true,
+    },
+    patientInfo: {
+      name: 'Arthur Pendelton',
+      age: 58,
+      gender: 'Male',
+      complaint: 'Acute Sub-sternal Chest Pain radiating to left arm & diaphoresis',
+      acuity: 'Critical',
+      vitals: {
+        heartRate: 118,
+        bloodPressure: '162/98',
+        oxygenSaturation: 93,
+        respiratoryRate: 22,
+        temperature: 36.9,
+        ecgRhythm: 'STEMI / ST Elevation',
+      },
+      notes: '12-lead ECG confirmed anterolateral STEMI. 325mg Aspirin chewed, Sublingual Nitroglycerin given x2, 4L/min O2 via nasal cannula. Cath Lab pre-alerted.',
+    },
+    timelineLogs: [
+      { timestamp: '10:04 AM', status: AmbulanceStatus.EnRouteToScene, note: 'Dispatched to 742 Evergreen Terrace for cardiac distress.' },
+      { timestamp: '10:12 AM', status: AmbulanceStatus.AtScene, note: 'Arrived at scene. Patient conscious, pale, severe chest pain.' },
+      { timestamp: '10:22 AM', status: AmbulanceStatus.TransportingToHospital, note: 'Patient loaded onto Stryker gurney. Transporting Code 3 to Cath Lab ER.' },
+    ],
+  },
+  {
+    id: 'amb-03',
+    unitNumber: 'B-201',
+    status: AmbulanceStatus.EnRouteToScene,
+    etaMinutes: 3,
+    etaSeconds: 180,
+    distanceKmRemaining: 2.1,
+    speedMph: 64,
+    vehicleType: 'ALS',
+    driverName: 'EMT Carlos Mendez',
+    paramedicName: 'Paramedic Maya Lin',
+    currentAddress: 'North Central Blvd crossing 12th Ave',
+    destinationAddress: 'Grand Plaza Shopping Center, North Entrance',
+    priorityCode: 'Code 3 (Emergency Hot)',
+    dispatchedAt: '10:24 AM',
+    fuelLevelPercent: 88,
+    gpsCoords: { x: 68, y: 32 },
+    headingDeg: 135,
+    routeProgressPercent: 48,
+    lightsActive: true,
+    turnInstruction: 'Approaching Grand Plaza Mall perimeter',
+    equipmentStatus: {
+      defibrillator: true,
+      oxygenLevelPercent: 95,
+      ventilator: true,
+      suctionUnit: true,
+    },
+    patientInfo: {
+      name: 'Unidentified Female (~30s)',
+      complaint: 'Multiple Vehicle Collision with Airbag Deployment & Extrication',
+      acuity: 'Critical',
+      vitals: {
+        heartRate: 104,
+        bloodPressure: '128/82',
+        oxygenSaturation: 97,
+      },
+      notes: 'Caller reports 2-car collision, driver conscious with head contusion. Fire Dept rescue in progress.',
+    },
+    timelineLogs: [
+      { timestamp: '10:24 AM', status: AmbulanceStatus.EnRouteToScene, note: 'Dispatched Code 3 with siren & strobe lights active.' },
+    ],
+  },
+  {
+    id: 'amb-04',
+    unitNumber: 'C-301',
+    status: AmbulanceStatus.AtScene,
+    etaMinutes: 0,
+    speedMph: 0,
+    vehicleType: 'BLS',
+    driverName: 'EMT James Walker',
+    paramedicName: 'Paramedic Chloe Bennett',
+    currentAddress: '418 Oakwood Ave, Apt 3B',
+    destinationAddress: 'MediFlow Emergency Center',
+    priorityCode: 'Code 2 (Urgent)',
+    dispatchedAt: '10:14 AM',
+    fuelLevelPercent: 74,
+    gpsCoords: { x: 78, y: 68 },
+    headingDeg: 180,
+    routeProgressPercent: 100,
+    onSceneTimerSeconds: 310,
+    lightsActive: true,
+    turnInstruction: 'Parked at residential scene - Paramedics administering Nebulizer',
+    equipmentStatus: {
+      defibrillator: true,
+      oxygenLevelPercent: 84,
+      ventilator: false,
+      suctionUnit: true,
+    },
+    patientInfo: {
+      name: 'Eleanor Vance',
+      age: 72,
+      gender: 'Female',
+      complaint: 'Acute Exacerbation of COPD with severe wheezing & dyspnea',
+      acuity: 'Urgent',
+      vitals: {
+        heartRate: 98,
+        bloodPressure: '138/86',
+        oxygenSaturation: 89,
+        respiratoryRate: 26,
+        temperature: 37.2,
+        ecgRhythm: 'Sinus Tachycardia',
+      },
+      notes: 'Albuterol / Ipratropium nebulizer treatment initiated in living room. Patient responding favorably, preparing for stair-chair transfer.',
+    },
+    timelineLogs: [
+      { timestamp: '10:14 AM', status: AmbulanceStatus.EnRouteToScene, note: 'Dispatched Code 2 to residential address.' },
+      { timestamp: '10:21 AM', status: AmbulanceStatus.AtScene, note: 'Unit arrived on scene. Paramedics entered residence with trauma bag & nebulizer.' },
+    ],
+  },
+  {
+    id: 'amb-05',
+    unitNumber: 'D-401',
+    status: AmbulanceStatus.AtHospital,
+    etaMinutes: 0,
+    speedMph: 0,
+    vehicleType: 'ALS',
+    bayNumber: 'Trauma Bay 04',
+    driverName: 'EMT Lucas Reed',
+    paramedicName: 'Paramedic Rachel Adams',
+    currentAddress: 'MediFlow Trauma Bay 04 (Ingress Ramp)',
+    fuelLevelPercent: 91,
+    gpsCoords: { x: 53, y: 47 },
+    headingDeg: 270,
+    routeProgressPercent: 0,
+    lightsActive: false,
+    turnInstruction: 'Trauma Bay 4 Ingress Ramp Handover',
+    equipmentStatus: {
+      defibrillator: true,
+      oxygenLevelPercent: 90,
+      ventilator: true,
+      suctionUnit: true,
+    },
+    patientInfo: {
+      name: 'Samuel Green',
+      age: 44,
+      gender: 'Male',
+      complaint: 'Right Femur Fracture & Lacerations',
+      acuity: 'Stable',
+      vitals: {
+        heartRate: 86,
+        bloodPressure: '124/78',
+        oxygenSaturation: 99,
+      },
+      notes: 'Handed over to Orthopedic Trauma Attending Dr. Chen in Bay 4. Traction splint in place.',
+    },
+    timelineLogs: [
+      { timestamp: '09:50 AM', status: AmbulanceStatus.EnRouteToScene, note: 'Dispatched to construction site.' },
+      { timestamp: '10:02 AM', status: AmbulanceStatus.AtScene, note: 'Leg splinted and immobilized.' },
+      { timestamp: '10:14 AM', status: AmbulanceStatus.TransportingToHospital, note: 'En route to Trauma Center.' },
+      { timestamp: '10:28 AM', status: AmbulanceStatus.AtHospital, note: 'Patient successfully delivered to ER Bay 4 trauma team.' },
+    ],
+  },
 ];
 
 export const MOCK_BROUGHT_DEAD_RECORDS: BroughtDeadRecord[] = [
@@ -209,44 +416,15 @@ export const MOCK_INCIDENT_REPORTS: IncidentReport[] = [
     patientId: 'pat-001',
     dateReported: '2024-07-26T10:00:00Z',
     reportedBy: 'Jackie Smith',
-    description: 'Patient was administered 10mg of Warfarin instead of the prescribed 5mg due to a transcription error from the doctor\'s notes to the medication chart.',
+    description: 'Patient was administered 10mg of Warfarin instead of the prescribed 5mg due to a transcription error.',
     medicationInvolved: 'Warfarin',
     status: IncidentStatus.Pending,
   },
-  {
-    id: 'inc-002',
-    type: IncidentType.ADR,
-    patientId: 'pat-003',
-    dateReported: '2024-07-25T15:20:00Z',
-    reportedBy: 'Jackie Smith',
-    description: 'After the first dose of Penicillin, the patient developed a widespread urticarial rash and mild shortness of breath. The medication was immediately discontinued.',
-    medicationInvolved: 'Penicillin',
-    status: IncidentStatus.Analyzed,
-    analysis: {
-        severity: IncidentSeverity.Moderate,
-        rootCause: "Patient had an undocumented allergy to penicillin. Pre-administration allergy checks were not sufficiently thorough.",
-        correctivePlan: "1. Update patient record with penicillin allergy.\n2. Reinforce protocol for allergy verification before administering new medications.\n3. Monitor patient for any further reaction."
-    }
-  },
-  {
-    id: 'inc-003',
-    type: IncidentType.Materiovigilance,
-    patientId: 'pat-005',
-    dateReported: '2024-07-24T09:00:00Z',
-    reportedBy: 'Tech Officer',
-    description: 'The infusion pump (Model XYZ-123) malfunctioned, delivering the IV fluids at a faster rate than programmed. The error was caught quickly by the attending nurse, and the patient was unharmed.',
-    status: IncidentStatus.Resolved,
-    analysis: {
-        severity: IncidentSeverity.Mild,
-        rootCause: "A software glitch in the infusion pump's firmware caused an incorrect dosage calculation.",
-        correctivePlan: "1. All pumps of Model XYZ-123 have been recalled and sent for a firmware update.\n2. Nurses have been instructed to double-check infusion rates manually for the first 15 minutes."
-    }
-  }
 ];
 
 export const MOCK_ER_QUEUE: QueueItem[] = [
     {
-        id: Date.now() + 1,
+        id: 1,
         bayNumber: 1,
         complaint: 'Difficulty breathing and chest tightness.',
         vitals: {
@@ -257,40 +435,9 @@ export const MOCK_ER_QUEUE: QueueItem[] = [
         },
         result: {
             priority: TriagePriority.CRITICAL,
-            rationale: 'Symptoms are indicative of a potential cardiac or respiratory emergency. Low oxygen saturation and tachycardia require immediate attention.'
+            rationale: 'Low oxygen saturation and tachycardia require immediate attention.'
         }
     },
-    {
-        id: Date.now() + 2,
-        bayNumber: 2,
-        complaint: 'High fever (103°F) and persistent cough for two days.',
-        vitals: {
-            heartRate: 105,
-            bloodPressure: '130/85',
-            oxygenSaturation: 96,
-            temperature: 39.4,
-            respiratoryRate: 22
-        },
-        result: {
-            priority: TriagePriority.URGENT,
-            rationale: 'High fever and respiratory symptoms suggest a significant infection, such as pneumonia, requiring prompt evaluation.'
-        }
-    },
-    {
-        id: Date.now() + 3,
-        bayNumber: 3,
-        complaint: 'Twisted ankle during a run, mild swelling and pain.',
-        vitals: {
-            heartRate: 80,
-            bloodPressure: '120/80',
-            oxygenSaturation: 99,
-            temperature: 37.0
-        },
-        result: {
-            priority: TriagePriority.NON_URGENT,
-            rationale: 'Localized injury with stable vitals. Patient can be seen after more critical cases are addressed.'
-        }
-    }
 ];
 
 
@@ -307,25 +454,7 @@ export const MOCK_MORTUARY_RECORDS: MortuaryRecord[] = [
         status: MortuaryStatus.Admitted,
         dateAdmitted: new Date().toISOString(),
         chainOfCustody: [
-            { timestamp: new Date().toISOString(), person: 'Admin User', action: 'Case Registered.' },
-            { timestamp: new Date().toISOString(), person: 'Dr. Evelyn Reed', action: 'Death Declaration Signed.' }
-        ]
-    },
-    {
-        id: 'mort-002',
-        name: 'Jane Doe',
-        age: 45,
-        gender: 'Female',
-        dateOfDeath: '2024-07-27T08:00:00Z',
-        causeOfDeath: 'Complications from Pneumonia',
-        storageLocation: 'Locker A-02',
-        status: MortuaryStatus.Released,
-        dateAdmitted: '2024-07-27T09:15:00Z',
-        dateReleased: '2024-07-28T11:00:00Z',
-        releasedTo: 'Robert Doe (Spouse)',
-        chainOfCustody: [
-            { timestamp: '2024-07-27T09:15:00Z', person: 'Admin User', action: 'Case Registered.' },
-            { timestamp: '2024-07-28T11:00:00Z', person: 'Admin User', action: 'Body released to Robert Doe.' }
+            { timestamp: new Date().toISOString(), person: 'Admin User', action: 'Case Registered.' }
         ]
     }
 ];
@@ -336,80 +465,25 @@ export const MOCK_COMPLAINTS: ComplaintTicket[] = [
     patientId: 'pat-005',
     patientName: 'Alex Ray',
     submittedAt: '2024-07-28T10:00:00Z',
-    complaintText: 'The billing statement I received seems to have an overcharge for the CT scan. The quoted price was much lower than what is on the bill. Can someone please look into this?',
+    complaintText: 'Billing overcharge for CT scan.',
     channel: 'Portal',
     status: ComplaintStatus.OPEN,
     category: ComplaintCategory.BILLING,
     urgency: ComplaintUrgency.MEDIUM,
-    summary: 'Patient is disputing a charge for a CT scan on their bill.',
+    summary: 'Charge dispute for CT scan.',
     assignedTo: 'user-adm-01',
     assignedToName: 'Admin User',
     history: [
       { timestamp: '2024-07-28T10:00:00Z', action: 'Complaint Submitted.', actor: 'Alex Ray' },
-      { timestamp: '2024-07-28T10:00:15Z', action: 'AI Analysis Complete. Assigned to Admin.', actor: 'System (AI)' },
-    ],
-  },
-  {
-    id: 'comp-002',
-    patientId: 'pat-002',
-    patientName: 'Emily Johnson',
-    submittedAt: '2024-07-27T15:30:00Z',
-    complaintText: 'The waiting time for my neurology appointment was over 2 hours past the scheduled time. This is unacceptable, especially for someone suffering from a migraine.',
-    channel: 'Portal',
-    status: ComplaintStatus.IN_PROGRESS,
-    category: ComplaintCategory.WAIT_TIME,
-    urgency: ComplaintUrgency.HIGH,
-    summary: 'Patient expresses frustration over a long wait time for a neurology appointment.',
-    assignedTo: 'user-doc-03',
-    assignedToName: 'Dr. Chloe Davis',
-    resolutionNotes: 'Contacted patient to apologize. Reviewing scheduling procedures to prevent this in the future.',
-    history: [
-      { timestamp: '2024-07-27T15:30:00Z', action: 'Complaint Submitted.', actor: 'Emily Johnson' },
-      { timestamp: '2024-07-27T15:30:12Z', action: 'AI Analysis Complete.', actor: 'System (AI)' },
-      { timestamp: '2024-07-28T09:00:00Z', action: 'Assigned to Dr. Chloe Davis.', actor: 'Admin User' },
-    ],
-  },
-  {
-    id: 'comp-003',
-    patientId: 'pat-001',
-    patientName: 'John Smith',
-    submittedAt: '2024-07-26T11:00:00Z',
-    complaintText: 'The restroom in the cardiology ward was not clean.',
-    channel: 'In-Person',
-    status: ComplaintStatus.RESOLVED,
-    category: ComplaintCategory.FACILITIES,
-    urgency: ComplaintUrgency.LOW,
-    summary: 'Patient reported an unclean restroom in the cardiology ward.',
-    assignedTo: 'user-eng-01',
-    assignedToName: 'Tech Officer',
-    resolutionNotes: 'Housekeeping staff was dispatched immediately to clean and sanitize the restroom. Ward nurse confirmed resolution.',
-    history: [
-      { timestamp: '2024-07-26T11:00:00Z', action: 'Complaint registered by staff.', actor: 'Admin User' },
-      { timestamp: '2024-07-26T11:00:10Z', action: 'AI Analysis Complete. Assigned to Engineering.', actor: 'System (AI)' },
-      { timestamp: '2024-07-26T11:30:00Z', action: 'Status changed to Resolved.', actor: 'Admin User' },
     ],
   },
 ];
 
 export const MOCK_PHARMACY_INVENTORY: PharmacyInventoryItem[] = [
     { id: 'pharm-001', drugName: 'Ciprofloxacin', stockQuantity: 150, reorderLevel: 50, costPerUnit: 25 },
-    { id: 'pharm-002', drugName: 'Acetaminophen', stockQuantity: 85, reorderLevel: 100, costPerUnit: 15 },
-    { id: 'pharm-003', drugName: 'Docusate Sodium', stockQuantity: 40, reorderLevel: 30, costPerUnit: 18 },
-    { id: 'pharm-004', drugName: 'Aspirin', stockQuantity: 200, reorderLevel: 100, costPerUnit: 5 },
-    { id: 'pharm-005', drugName: 'Sumatriptan', stockQuantity: 60, reorderLevel: 40, costPerUnit: 45 },
-    { id: 'pharm-006', drugName: 'Penicillin', stockQuantity: 120, reorderLevel: 75, costPerUnit: 25 },
 ];
 
-export const MOCK_ADR_REPORTS: ADRReport[] = [
-    {
-        id: 'adr-001',
-        patientId: 'pat-003',
-        drugInvolved: 'Penicillin',
-        reactionDescription: 'Patient developed a widespread urticarial rash and mild shortness of breath after the first dose.',
-        reportedBy: 'Maria Hill',
-        reportedAt: new Date().toISOString(),
-    }
-];
+export const MOCK_ADR_REPORTS: ADRReport[] = [];
 
 export const MOCK_LAB_TESTS: LabTest[] = [
   {
@@ -421,13 +495,12 @@ export const MOCK_LAB_TESTS: LabTest[] = [
     orderedAt: '2024-07-28T10:00:00Z',
     status: LabTestStatus.COMPLETED,
     sampleId: 'SMP-001-A',
-    completedAt: '2024-07-28T14:30:00Z',
+    completedAt: '2024-07-28T14:00:00Z',
     results: [
-      { parameter: 'WBC', value: '12.5', referenceRange: '4.5-11.0 x10^9/L', isAbnormal: true },
-      { parameter: 'RBC', value: '4.8', referenceRange: '4.2-5.9 x10^12/L', isAbnormal: false },
-      { parameter: 'Hemoglobin', value: '14.5', referenceRange: '13.5-17.5 g/dL', isAbnormal: false },
-      { parameter: 'Platelets', value: '250', referenceRange: '150-450 x10^9/L', isAbnormal: false },
-    ],
+      { parameter: 'Hemoglobin', value: '14.2', referenceRange: '13.5-17.5', isAbnormal: false },
+      { parameter: 'WBC Count', value: '11.5', referenceRange: '4.5-11.0', isAbnormal: true },
+      { parameter: 'Platelets', value: '210', referenceRange: '150-450', isAbnormal: false },
+    ]
   },
   {
     id: 'lab-002',
@@ -435,27 +508,13 @@ export const MOCK_LAB_TESTS: LabTest[] = [
     patientName: 'Alex Ray',
     testName: 'Basic Metabolic Panel',
     orderedBy: 'Dr. James Wilson',
-    orderedAt: '2024-07-29T09:15:00Z',
-    status: LabTestStatus.IN_PROGRESS,
-    sampleId: 'SMP-002-B',
-  },
-  {
-    id: 'lab-003',
-    patientId: 'pat-003',
-    patientName: 'Michael Williams',
-    testName: 'Sputum Culture',
-    orderedBy: 'Dr. James Wilson',
-    orderedAt: '2024-07-29T11:00:00Z',
-    status: LabTestStatus.SAMPLE_COLLECTED,
-    sampleId: 'SMP-003-C',
-  },
-  {
-    id: 'lab-004',
-    patientId: 'pat-002',
-    patientName: 'Emily Johnson',
-    testName: 'Thyroid Panel',
-    orderedBy: 'Dr. Chloe Davis',
-    orderedAt: '2024-07-29T12:00:00Z',
-    status: LabTestStatus.ORDERED,
-  },
+    orderedAt: '2024-07-27T10:00:00Z',
+    status: LabTestStatus.COMPLETED,
+    sampleId: 'SMP-005-B',
+    completedAt: '2024-07-27T16:00:00Z',
+    results: [
+      { parameter: 'Glucose', value: '105', referenceRange: '70-99', isAbnormal: true },
+      { parameter: 'Sodium', value: '138', referenceRange: '135-145', isAbnormal: false },
+    ]
+  }
 ];

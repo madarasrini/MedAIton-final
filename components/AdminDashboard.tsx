@@ -1,8 +1,13 @@
+
 import React, { useState, useMemo, FC, useEffect } from 'react';
-import { User, PatientRecord, Bed, BedStatus, QueueItem, TriageResult, TriagePriority, MortuaryRecord, MortuaryStatus, ChainOfCustodyEntry, ComplaintTicket, ComplaintStatus, UserRole, Ambulance, AmbulanceStatus } from '../types';
-import { getER_TriagePriority } from '../services/geminiService';
-import { UserIcon, BedIcon, ClipboardListIcon, SparklesIcon, ArchiveBoxIcon, PencilIcon, ComplaintIcon, UsersIcon, XIcon, SirenIcon, AmbulanceIcon, CheckCircleIcon } from './Icons';
-import { MOCK_AMBULANCES } from '../constants';
+import { User, PatientRecord, Bed, BedStatus, QueueItem, TriageResult, TriagePriority, MortuaryRecord, MortuaryStatus, ChainOfCustodyEntry, ComplaintTicket, ComplaintStatus, UserRole, Ambulance, AmbulanceStatus } from '../types.ts';
+import { getER_TriagePriority } from '../services/geminiService.ts';
+import { UserIcon, BedIcon, ClipboardListIcon, SparklesIcon, ArchiveBoxIcon, PencilIcon, ComplaintIcon, UsersIcon, XIcon, SirenIcon, AmbulanceIcon, CheckCircleIcon } from './Icons.tsx';
+import { MOCK_AMBULANCES } from '../constants.ts';
+import { BedManagement } from './BedManagement.tsx';
+import { BedRiskTrendChart } from './BedRiskTrendChart.tsx';
+import { AmbulanceDispatch } from './AmbulanceDispatch.tsx';
+import { SoundControl } from './SoundControl.tsx';
 
 interface AdminDashboardProps {
   user: User;
@@ -16,6 +21,14 @@ interface AdminDashboardProps {
   complaintTickets: ComplaintTicket[];
   onUpdateComplaint: (updatedTicket: ComplaintTicket, actorName: string) => void;
   allUsers: User[];
+  onUpdateBed?: (updatedBed: Bed) => void;
+  onDischargeBedPatient?: (bedId: string) => void;
+  onCompleteBedCleaning?: (bedId: string) => void;
+  onMarkBedCleaning?: (bedId: string) => void;
+  onSmartAssignBed?: (bedId: string, queueItemId: number) => boolean;
+  onImportBeds?: (beds: Bed[]) => void;
+  onTriggerSimulationTick?: () => void;
+  onResetBedsToDefault?: () => void;
 }
 
 type AdminTab = 'overview' | 'er-triage' | 'beds' | 'mortuary' | 'complaints' | 'ambulance';
@@ -50,7 +63,7 @@ const TriageForm: FC<{ onAddToQueue: (item: QueueItem) => void; currentQueueLeng
     const handleAddToQueue = () => {
         if (!triageResult) return;
         const newQueueItem: QueueItem = {
-            id: Date.now(),
+            id: Date.now() + Math.floor(Math.random() * 100000),
             bayNumber: currentQueueLength + 1,
             complaint,
             vitals,
@@ -201,85 +214,6 @@ const MortuaryRecordModal: FC<{
     );
 };
 
-const AmbulanceDispatch: FC = () => {
-    const [ambulances, setAmbulances] = useState<Ambulance[]>(MOCK_AMBULANCES);
-
-    useEffect(() => {
-        const interval = setInterval(() => {
-            setAmbulances(prevAmbulances => {
-                return prevAmbulances.map(amb => {
-                    let { status, etaMinutes } = amb;
-                    switch (status) {
-                        case AmbulanceStatus.Available:
-                            if (Math.random() < 0.1) status = AmbulanceStatus.EnRouteToScene;
-                            break;
-                        case AmbulanceStatus.EnRouteToScene:
-                            if (Math.random() < 0.3) status = AmbulanceStatus.AtScene;
-                            break;
-                        case AmbulanceStatus.AtScene:
-                            if (Math.random() < 0.4) {
-                                status = AmbulanceStatus.TransportingToHospital;
-                                etaMinutes = Math.floor(Math.random() * 10) + 5;
-                            }
-                            break;
-                        case AmbulanceStatus.TransportingToHospital:
-                            etaMinutes = (etaMinutes ?? 1) - 1;
-                            if (etaMinutes <= 0) {
-                                status = AmbulanceStatus.AtHospital;
-                                etaMinutes = undefined;
-                            }
-                            break;
-                        case AmbulanceStatus.AtHospital:
-                            status = AmbulanceStatus.Available;
-                            break;
-                    }
-                    return { ...amb, status, etaMinutes };
-                });
-            });
-        }, 5000); // Update every 5 seconds
-        return () => clearInterval(interval);
-    }, []);
-
-    const getStatusStyles = (status: AmbulanceStatus) => {
-        switch (status) {
-            case AmbulanceStatus.Available: return { bg: 'bg-green-100', border: 'border-green-500', text: 'text-green-800' };
-            case AmbulanceStatus.EnRouteToScene: return { bg: 'bg-yellow-100', border: 'border-yellow-500', text: 'text-yellow-800' };
-            case AmbulanceStatus.AtScene: return { bg: 'bg-orange-100', border: 'border-orange-500', text: 'text-orange-800' };
-            case AmbulanceStatus.TransportingToHospital: return { bg: 'bg-blue-100', border: 'border-blue-500', text: 'text-blue-800' };
-            case AmbulanceStatus.AtHospital: return { bg: 'bg-purple-100', border: 'border-purple-500', text: 'text-purple-800' };
-            default: return { bg: 'bg-gray-100', border: 'border-gray-500', text: 'text-gray-800' };
-        }
-    };
-
-    return (
-        <div className="animate-fade-in">
-            <h3 className="text-xl font-semibold text-gray-800 mb-4">Live Ambulance Fleet Status</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {ambulances.map(amb => {
-                    const styles = getStatusStyles(amb.status);
-                    return (
-                        <div key={amb.id} className={`p-4 rounded-lg border-l-4 shadow-sm ${styles.bg} ${styles.border}`}>
-                            <div className="flex justify-between items-center">
-                                <h4 className="font-bold text-lg text-gray-800">Unit {amb.unitNumber}</h4>
-                                <span className={`px-3 py-1 text-sm font-semibold rounded-full ${styles.text} ${styles.bg}`}>{amb.status}</span>
-                            </div>
-                            <div className="mt-4 text-sm text-gray-700">
-                                {amb.status === AmbulanceStatus.TransportingToHospital && (
-                                    <>
-                                        <p><strong>ETA:</strong> {amb.etaMinutes} minutes</p>
-                                        <p><strong>Patient:</strong> {amb.patientInfo?.complaint}</p>
-                                    </>
-                                )}
-                                {amb.status === AmbulanceStatus.Available && <p>Standing by for dispatch.</p>}
-                            </div>
-                        </div>
-                    );
-                })}
-            </div>
-        </div>
-    );
-};
-
 const AdminDashboard: FC<AdminDashboardProps> = ({
   user,
   patients,
@@ -292,24 +226,25 @@ const AdminDashboard: FC<AdminDashboardProps> = ({
   complaintTickets,
   onUpdateComplaint,
   allUsers,
+  onUpdateBed,
+  onDischargeBedPatient,
+  onCompleteBedCleaning,
+  onMarkBedCleaning,
+  onSmartAssignBed,
+  onImportBeds,
+  onTriggerSimulationTick,
+  onResetBedsToDefault,
 }) => {
-    const [activeTab, setActiveTab] = useState<AdminTab>('overview');
-    const [isMortuaryModalOpen, setIsMortuaryModalOpen] = useState(false);
-    const [selectedMortuaryRecord, setSelectedMortuaryRecord] = useState<MortuaryRecord | null>(null);
+  const [activeTab, setActiveTab] = useState<AdminTab>('overview');
+  const [isMortuaryModalOpen, setIsMortuaryModalOpen] = useState(false);
+  const [selectedMortuaryRecord, setSelectedMortuaryRecord] = useState<MortuaryRecord | null>(null);
 
-    const availableBeds = useMemo(() => beds.filter(b => b.status === BedStatus.Available).length, [beds]);
-    const bedsByWard = useMemo(() => {
-        return beds.reduce((acc, bed) => {
-            if (!acc[bed.ward]) acc[bed.ward] = [];
-            acc[bed.ward].push(bed);
-            return acc;
-        }, {} as Record<string, Bed[]>);
-    }, [beds]);
-    
-    const staffUsers = useMemo(() => allUsers.filter(u => u.role !== UserRole.Patient), [allUsers]);
-    const [selectedTicket, setSelectedTicket] = useState<ComplaintTicket | null>(null);
-    const [ticketStatus, setTicketStatus] = useState<ComplaintStatus | undefined>(undefined);
-    const [assignedTo, setAssignedTo] = useState<string | undefined>(undefined);
+  const availableBeds = useMemo(() => beds.filter(b => b.status === BedStatus.Available).length, [beds]);
+  
+  const staffUsers = useMemo(() => allUsers.filter(u => u.role !== UserRole.Patient), [allUsers]);
+  const [selectedTicket, setSelectedTicket] = useState<ComplaintTicket | null>(null);
+  const [ticketStatus, setTicketStatus] = useState<ComplaintStatus | undefined>(undefined);
+  const [assignedTo, setAssignedTo] = useState<string | undefined>(undefined);
 
     const handleUpdateTicket = () => {
         if (!selectedTicket || !ticketStatus) return;
@@ -361,42 +296,49 @@ const AdminDashboard: FC<AdminDashboardProps> = ({
         switch (activeTab) {
             case 'overview':
                 return (
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6 animate-fade-in">
-                        <StatCard title="Total Patients" value={patients.length} icon={<UsersIcon className="h-8 w-8 text-blue-500" />} />
-                        <StatCard title="Available Beds" value={`${availableBeds} / ${beds.length}`} icon={<BedIcon className="h-8 w-8 text-green-500" />} />
-                        <StatCard title="ER Queue" value={erQueue.length} icon={<SirenIcon className="h-8 w-8 text-red-500" />} />
+                    <div className="space-y-6 animate-fade-in">
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                            <StatCard title="Total Patients" value={patients.length} icon={<UsersIcon className="h-8 w-8 text-blue-500" />} />
+                            <StatCard title="Available Beds" value={`${availableBeds} / ${beds.length}`} icon={<BedIcon className="h-8 w-8 text-green-500" />} />
+                            <StatCard title="ER Queue" value={erQueue.length} icon={<SirenIcon className="h-8 w-8 text-red-500" />} />
+                        </div>
+                        <BedRiskTrendChart 
+                            beds={beds} 
+                            onSelectBed={() => setActiveTab('beds')}
+                        />
                     </div>
                 );
             case 'er-triage':
                 return <TriageForm onAddToQueue={onAddToQueue} currentQueueLength={erQueue.length} />;
             case 'beds':
                 return (
-                    <div className="space-y-6 animate-fade-in">
-                        {Object.entries(bedsByWard).map(([ward, wardBeds]) => (
-                            <div key={ward}>
-                                <h3 className="text-xl font-semibold text-gray-800 mb-3">{ward}</h3>
-                                <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 gap-4">
-                                    {wardBeds.map(bed => {
-                                        const statusStyles = {
-                                            [BedStatus.Available]: 'bg-green-100 border-green-400 text-green-800',
-                                            [BedStatus.Occupied]: 'bg-red-100 border-red-400 text-red-800',
-                                            [BedStatus.Cleaning]: 'bg-yellow-100 border-yellow-400 text-yellow-800',
-                                        }[bed.status];
-                                        return (
-                                            <div key={bed.id} className={`p-4 rounded-lg border-l-4 ${statusStyles}`}>
-                                                <p className="font-bold">Bed {bed.bedNumber}</p>
-                                                <p className="text-sm font-medium">{bed.status}</p>
-                                                {bed.patientId && <p className="text-xs mt-1">Patient: {bed.patientId}</p>}
-                                            </div>
-                                        );
-                                    })}
-                                </div>
-                            </div>
-                        ))}
-                    </div>
+                    <BedManagement
+                        beds={beds}
+                        erQueue={erQueue}
+                        onUpdateBed={onUpdateBed}
+                        onDischargeBedPatient={onDischargeBedPatient}
+                        onCompleteBedCleaning={onCompleteBedCleaning}
+                        onMarkBedCleaning={onMarkBedCleaning}
+                        onSmartAssignBed={onSmartAssignBed}
+                        onImportBeds={onImportBeds}
+                        onTriggerSimulationTick={onTriggerSimulationTick}
+                        onResetBedsToDefault={onResetBedsToDefault}
+                    />
                 );
             case 'ambulance':
-                return <AmbulanceDispatch />;
+                return (
+                    <AmbulanceDispatch
+                        onAdmitToERQueue={(patient) => {
+                            onAddToQueue({
+                                id: Date.now() + Math.floor(Math.random() * 100000),
+                                bayNumber: patient.bayNumber || 1,
+                                complaint: patient.complaint,
+                                vitals: patient.vitals,
+                                result: patient.result,
+                            });
+                        }}
+                    />
+                );
             case 'mortuary':
                  return (
                     <div className="animate-fade-in">
@@ -489,9 +431,14 @@ const AdminDashboard: FC<AdminDashboardProps> = ({
   return (
     <div className="container mx-auto">
         {isMortuaryModalOpen && <MortuaryRecordModal record={selectedMortuaryRecord} onClose={() => setIsMortuaryModalOpen(false)} onSave={handleSaveMortuaryRecord} user={user} />}
-        <div className="mb-8">
-            <h2 className="text-3xl font-bold text-gray-800">Administrator Dashboard</h2>
-            <p className="text-lg text-gray-600">Welcome, {user.name}</p>
+        <div className="mb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4 glass-panel rounded-3xl p-6">
+            <div>
+                <h2 className="text-3xl font-extrabold text-gray-900 tracking-tight">Hospital Administration Operations</h2>
+                <p className="text-sm text-gray-500 font-semibold mt-0.5">Welcome, {user.name} • System Command & Resource Management</p>
+            </div>
+            <div className="flex items-center gap-3">
+                <SoundControl dashboardName="Admin Command Center" variant="pill" />
+            </div>
         </div>
 
         <div className="bg-white rounded-xl shadow-md p-2 sm:p-4">

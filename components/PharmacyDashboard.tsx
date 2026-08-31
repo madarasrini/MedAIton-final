@@ -1,9 +1,9 @@
 
-
 import React, { useState, useMemo, FC } from 'react';
-import { User, PatientRecord, PharmacyInventoryItem, Prescription, ADRReport } from '../types';
-import { MedicationIcon, ClipboardListIcon, CheckCircleIcon, XIcon, PharmacyIcon, InteractionIcon, FoodIcon, InfoIcon, ReportIcon, SparklesIcon } from './Icons';
-import { checkDrugInteractions, checkFoodDrugIncompatibility, getDrugInformation, getADRAnalysis } from '../services/geminiService';
+import { User, PatientRecord, PharmacyInventoryItem, Prescription, ADRReport } from '../types.ts';
+import { MedicationIcon, ClipboardListIcon, CheckCircleIcon, XIcon, PharmacyIcon, InteractionIcon, FoodIcon, InfoIcon, ReportIcon, SparklesIcon } from './Icons.tsx';
+import { checkDrugInteractions, checkFoodDrugIncompatibility, getDrugInformation, getADRAnalysis } from '../services/geminiService.ts';
+import { SoundControl } from './SoundControl.tsx';
 
 interface PharmacyDashboardProps {
   user: User;
@@ -21,7 +21,6 @@ interface EPrescription {
   prescription: Prescription;
 }
 
-// FIX: Corrected the type to include 'adr-analysis' to support the new tab and resolve a type error.
 type PharmacyTab = 'queue' | 'inventory' | 'interactions' | 'food' | 'info' | 'adr' | 'adr-analysis';
 
 const TabButton: FC<{ active: boolean; onClick: () => void; icon: React.ReactNode; label: string }> = ({ active, onClick, icon, label }) => (
@@ -195,7 +194,6 @@ const PharmacyDashboard: FC<PharmacyDashboardProps> = ({ user, patients, invento
     const [adrDrug, setAdrDrug] = useState('');
     const [adrDescription, setAdrDescription] = useState('');
     
-    // FIX: Add state to manage ADR analysis.
     const [isAnalyzingADR, setIsAnalyzingADR] = useState(false);
     const [adrAnalysisResult, setAdrAnalysisResult] = useState('');
     const [analyzedADR, setAnalyzedADR] = useState<ADRReport | null>(null);
@@ -296,7 +294,6 @@ const PharmacyDashboard: FC<PharmacyDashboardProps> = ({ user, patients, invento
         setTimeout(() => setShowSuccessToast(''), 3000);
     };
 
-    // FIX: Add a handler to call the Gemini service for ADR analysis.
     const handleAnalyzeADR = async (report: ADRReport) => {
         if (!report) return;
         setAnalyzedADR(report);
@@ -428,7 +425,6 @@ const PharmacyDashboard: FC<PharmacyDashboardProps> = ({ user, patients, invento
                                 <p className="text-gray-800"><strong>Patient:</strong> {report.patientId}</p>
                                 <p className="text-gray-800"><strong>Drug:</strong> {report.drugInvolved}</p>
                                 <p className="text-gray-700 mt-1">{report.reactionDescription}</p>
-                                {/* FIX: Add a button to trigger ADR analysis. */}
                                 <div className="mt-2 pt-2 border-t flex justify-end">
                                     <button
                                         onClick={() => handleAnalyzeADR(report)}
@@ -444,7 +440,6 @@ const PharmacyDashboard: FC<PharmacyDashboardProps> = ({ user, patients, invento
                     </div>
                 </div>
             );
-            // FIX: Add a new case to render the ADR analysis result.
             case 'adr-analysis':
                 return (
                     <div className="animate-fade-in">
@@ -480,9 +475,14 @@ const PharmacyDashboard: FC<PharmacyDashboardProps> = ({ user, patients, invento
             {dispenseModalItem && <DispenseModal item={dispenseModalItem} inventoryItem={inventory.find(i => i.drugName === dispenseModalItem.prescription.drug)} onClose={() => setDispenseModalItem(null)} onConfirm={handleDispenseConfirm} />}
             {showRestockModal && <RestockModal inventory={inventory} onClose={() => setShowRestockModal(false)} onConfirm={handleRestockConfirm} />}
             
-            <div className="mb-8">
-                <h2 className="text-3xl font-bold text-gray-800">Pharmacy Information System</h2>
-                <p className="text-lg text-gray-600">Welcome, {user.name}</p>
+            <div className="mb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4 glass-panel rounded-3xl p-6">
+                <div>
+                    <h2 className="text-3xl font-extrabold text-gray-900 tracking-tight">Pharmacy Information System</h2>
+                    <p className="text-sm text-gray-500 font-semibold mt-0.5">Welcome, {user.name} • E-Prescriptions, Inventory & Pharmacovigilance</p>
+                </div>
+                <div className="flex items-center gap-3">
+                    <SoundControl dashboardName="Pharmacy Station" variant="pill" />
+                </div>
             </div>
             
             <div className="bg-white rounded-xl shadow-md">

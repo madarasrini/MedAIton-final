@@ -1,4 +1,5 @@
-import { User, UserRole, DoctorSpecialty } from './types';
+
+import { User, UserRole, DoctorSpecialty } from './types.ts';
 
 export const MOCK_USERS: User[] = [
     // Patient
@@ -128,5 +129,18 @@ export const MOCK_USERS: User[] = [
         patientsTreated: 5000,
         patientsCured: 4800,
         patientsUndergoingTreatment: 150,
+    },
+    {
+        id: 'user-doc-07',
+        name: 'Dr. Sarah Jenkins',
+        role: UserRole.Doctor,
+        username: 'doctor-gynaecologist',
+        password: 'password123',
+        specialty: DoctorSpecialty.Gynaecologist,
+        experienceYears: 14,
+        profilePhotoUrl: 'https://images.pexels.com/photos/5452201/pexels-photo-5452201.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1',
+        patientsTreated: 3100,
+        patientsCured: 3000,
+        patientsUndergoingTreatment: 65,
     },
 ];

@@ -1,5 +1,6 @@
+
 import React from 'react';
-import { BellIcon, LockIcon } from './Icons';
+import { BellIcon, LockIcon } from './Icons.tsx';
 
 interface NotificationHelpModalProps {
   onClose: () => void;
